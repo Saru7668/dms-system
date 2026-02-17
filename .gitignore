@@ -1,0 +1,71 @@
+# ============================================
+# PHP & Database Configuration (NEVER SHARE)
+# ============================================
+config.php
+database.php
+.env
+*.env
+.env.local
+.env.production
+connection.php
+db_connect.php
+
+# ============================================
+# Oracle APEX (if you export SQL files)
+# ============================================
+*.sql
+!schema/structure.sql
+apex_export/
+
+# ============================================
+# Uploads & Generated Files
+# ============================================
+uploads/
+images/upload/
+files/upload/
+documents/
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+
+# ============================================
+# Cache & Logs
+# ============================================
+cache/
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+
+# ============================================
+# Session & Cookies
+# ============================================
+sessions/
+cookies/
+
+# ============================================
+# IDE & Editor Files
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================
+# Dependencies (if using Composer/npm)
+# ============================================
+vendor/
+node_modules/
+composer.lock
+package-lock.json
+
+# ============================================
+# OS Generated Files
+# ============================================
+Thumbs.db
+desktop.ini
