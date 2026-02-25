@@ -4,7 +4,6 @@ session_start();
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-
 require_once('db.php');
 require_once('header.php');
 
@@ -16,10 +15,12 @@ if (!isset($_SESSION['UserName']) || $_SESSION['UserRole'] != 'admin') {
 $userName = $_SESSION['UserName'];
 $userRole = $_SESSION['UserRole'];
 
-$msg = "";
 // URL diye asha success message
 if (isset($_GET['msg']) && $_GET['msg'] === 'added') {
-    $msg = "<div class='alert alert-success shadow-sm'>? Room Added Successfully!</div>";
+    $_SESSION['msg'] = "Room Added Successfully!";
+    $_SESSION['msg_type'] = "success";
+    header("Location: admin_rooms.php");
+    exit;
 }
 
 // Add room
@@ -38,7 +39,8 @@ if (isset($_POST['add_room'])) {
 
     $check = mysqli_query($conn, "SELECT id FROM rooms WHERE room_no = '$room_no'");
     if (mysqli_num_rows($check) > 0) {
-        $msg = "<div class='alert alert-danger shadow-sm'>Room $room_no already exists!</div>";
+        $_SESSION['msg'] = "Room $room_no already exists!";
+        $_SESSION['msg_type'] = "danger";
     } else {
         $sql = "INSERT INTO rooms (room_no, floor, room_type, status, is_fixed, current_guest)
                 VALUES ('$room_no', '$floor', '$type', '$status', '$is_fixed', NULL)";
@@ -48,25 +50,41 @@ if (isset($_POST['add_room'])) {
             header("Location: admin_rooms.php?msg=added");
             exit;
         } else {
-            $msg = "<div class='alert alert-danger shadow-sm'>DB Error: " . mysqli_error($conn) . "</div>";
+            $_SESSION['msg'] = "DB Error: " . mysqli_error($conn);
+            $_SESSION['msg_type'] = "danger";
         }
     }
+    header("Location: admin_rooms.php");
+    exit;
 }
-
 
 // Delete room
 if (isset($_GET['del'])) {
     $id = (int)$_GET['del'];
-    mysqli_query($conn, "DELETE FROM rooms WHERE id=$id");
-    $msg = "<div class='alert alert-warning shadow-sm'>??? Room Deleted!</div>";
+    if(mysqli_query($conn, "DELETE FROM rooms WHERE id=$id")){
+        $_SESSION['msg'] = "Room Deleted Successfully!";
+        $_SESSION['msg_type'] = "warning";
+    } else {
+        $_SESSION['msg'] = "Delete failed: " . mysqli_error($conn);
+        $_SESSION['msg_type'] = "danger";
+    }
+    header("Location: admin_rooms.php");
+    exit;
 }
 
 // Update current guest for fixed room
 if (isset($_POST['update_guest'])) {
     $room_id = (int)$_POST['room_id'];
     $guest_name = mysqli_real_escape_string($conn, $_POST['current_guest']);
-    mysqli_query($conn, "UPDATE rooms SET current_guest = '$guest_name' WHERE id = $room_id");
-    $msg = "<div class='alert alert-info shadow-sm'>?? Guest name updated!</div>";
+    if(mysqli_query($conn, "UPDATE rooms SET current_guest = '$guest_name' WHERE id = $room_id")){
+        $_SESSION['msg'] = "Guest name updated!";
+        $_SESSION['msg_type'] = "info";
+    } else {
+        $_SESSION['msg'] = "Failed to update guest!";
+        $_SESSION['msg_type'] = "danger";
+    }
+    header("Location: admin_rooms.php");
+    exit;
 }
 ?>
 
@@ -81,10 +99,30 @@ if (isset($_POST['update_guest'])) {
 body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
 .sidebar { background: #1a2a3a; color: white; min-height: 100vh; padding: 20px; }
 .badge-role { font-size: 0.75rem; padding: 4px 8px; border-radius: 10px; }
+
+/* ? ???-?? ?????????? */
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 </style>
 </head>
 <body>
-<div class="container-fluid">
+
+<!-- ? ??????? ????? ????????? ????????? -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid fade-in">
 <div class="row">
 
     <div class="col-md-2 sidebar">
@@ -107,11 +145,43 @@ body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
     </div>
 
     <div class="col-md-10 py-4">
+        
+        <?php if(isset($_SESSION['msg'])): ?>
+            <?php 
+                $toast_msg = $_SESSION['msg'];
+                $toast_type = isset($_SESSION['msg_type']) ? $_SESSION['msg_type'] : 'info';
+                
+                unset($_SESSION['msg']);
+                unset($_SESSION['msg_type']);
+            ?>
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    var toastEl = document.getElementById('liveToast');
+                    var toastBody = document.getElementById('toastMessage');
+                    var closeBtn = document.getElementById('toastCloseBtn');
+                    
+                    toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white', 'text-dark');
+                    closeBtn.classList.remove('btn-close-white');
+                    
+                    if ('<?php echo $toast_type; ?>' === 'warning' || '<?php echo $toast_type; ?>' === 'info') {
+                        toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-dark');
+                    } else {
+                        toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-white');
+                        closeBtn.classList.add('btn-close-white');
+                    }
+                    
+                    toastBody.innerHTML = "<?php echo addslashes($toast_msg); ?>";
+                    var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+                    toast.show();
+                });
+            </script>
+        <?php endif; ?>
+
         <div class="row">
             <div class="col-md-4">
                 <div class="card p-4 shadow-sm">
                     <h4 class="text-primary"><i class="fas fa-plus-circle"></i> Add New Room</h4>
-                    <?php echo $msg; ?>
+                    
                     <form method="post">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Room Number</label>

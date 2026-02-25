@@ -17,11 +17,13 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $query = mysqli_query($conn, "SELECT * FROM rooms WHERE id=$id");
 $room = mysqli_fetch_assoc($query);
 
+// Room ?? ???? ????? ??????????? admin_rooms.php ?? ???? ??????
 if (!$room) {
-    die("<div class='alert alert-danger m-5'>Room not found! <a href='admin_rooms.php' class='btn btn-primary btn-sm'>Back</a></div>");
+    $_SESSION['msg'] = "Room not found!";
+    $_SESSION['msg_type'] = "danger";
+    header("Location: admin_rooms.php");
+    exit;
 }
-
-$error = "";
 
 // ? UPDATE LOGIC
 if (isset($_POST['update_room'])) {
@@ -33,7 +35,6 @@ if (isset($_POST['update_room'])) {
 
     $status = ($is_fixed === 'Yes') ? 'Booked' : 'Available';
 
-
     $sql = "UPDATE rooms 
             SET room_no='$room_no', 
                 floor='$floor', 
@@ -44,10 +45,17 @@ if (isset($_POST['update_room'])) {
             WHERE id=$id";
 
     if (mysqli_query($conn, $sql)) {
-        header("Location: admin_rooms.php?msg=edited");
+        // ? Save ???? admin_rooms.php ?? redirect ????
+        $_SESSION['msg'] = "Room updated successfully!";
+        $_SESSION['msg_type'] = "success";
+        header("Location: admin_rooms.php");
         exit;
     } else {
-        $error = "Error: " . mysqli_error($conn);
+        // ? Error ??? ?? ????? ??? ????? ??????
+        $_SESSION['msg'] = "Error updating room: " . mysqli_error($conn);
+        $_SESSION['msg_type'] = "danger";
+        header("Location: admin_edit_room.php?id=$id");
+        exit;
     }
 }
 ?>
@@ -70,11 +78,30 @@ if (isset($_POST['update_room'])) {
         /* ? PAGE SPECIFIC STYLES */
         .edit-card { border: none; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .main-content { padding: 30px; }
+
+        /* ? ???-?? ?????????? */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
-<div class="container-fluid">
+<!-- ? ??????? ????? ????????? ????????? -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid fade-in">
     <div class="row">
 
         <!-- ? SIDEBAR (COPIED EXACTLY FROM ADMIN_ROOMS.PHP) -->
@@ -99,6 +126,37 @@ if (isset($_POST['update_room'])) {
 
         <!-- ? MAIN CONTENT AREA -->
         <div class="col-md-10 main-content">
+            
+            <?php if(isset($_SESSION['msg'])): ?>
+                <?php 
+                    $toast_msg = $_SESSION['msg'];
+                    $toast_type = isset($_SESSION['msg_type']) ? $_SESSION['msg_type'] : 'info';
+                    unset($_SESSION['msg']);
+                    unset($_SESSION['msg_type']);
+                ?>
+                <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        var toastEl = document.getElementById('liveToast');
+                        var toastBody = document.getElementById('toastMessage');
+                        var closeBtn = document.getElementById('toastCloseBtn');
+                        
+                        toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white', 'text-dark');
+                        closeBtn.classList.remove('btn-close-white');
+                        
+                        if ('<?php echo $toast_type; ?>' === 'warning' || '<?php echo $toast_type; ?>' === 'info') {
+                            toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-dark');
+                        } else {
+                            toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-white');
+                            closeBtn.classList.add('btn-close-white');
+                        }
+                        
+                        toastBody.innerHTML = "<?php echo addslashes($toast_msg); ?>";
+                        var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+                        toast.show();
+                    });
+                </script>
+            <?php endif; ?>
+
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="text-dark fw-bold"><i class="fas fa-edit me-2"></i>Edit Room Configuration</h3>
                 <nav aria-label="breadcrumb">
@@ -109,13 +167,6 @@ if (isset($_POST['update_room'])) {
                     </ol>
                 </nav>
             </div>
-
-            <?php if (!empty($error)): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2"></i><?php echo $error; ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
 
             <div class="card edit-card">
                 <div class="card-body p-5">

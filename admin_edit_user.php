@@ -9,7 +9,6 @@ if (!isset($_SESSION['UserName']) || $_SESSION['UserRole'] !== 'admin') {
     exit;
 }
 
-$message = "";
 $user_id = "";
 
 // Get user data
@@ -46,11 +45,16 @@ if (isset($_POST['update_user'])) {
     }
 
     if ($stmt->execute()) {
-        $message = "<div class='alert alert-success shadow-sm'>User updated successfully!</div>";
-        $query = mysqli_query($conn, "SELECT * FROM users WHERE id = '$user_id'");
-        $user_data = mysqli_fetch_assoc($query);
+        // ? Save ???? admin_users.php ?? redirect ????
+        $_SESSION['msg'] = "User updated successfully!";
+        $_SESSION['msg_type'] = "success";
+        header("Location: admin_users.php");
+        exit;
     } else {
-        $message = "<div class='alert alert-danger shadow-sm'>Update failed: " . $conn->error . "</div>";
+        $_SESSION['msg'] = "Update failed: " . $conn->error;
+        $_SESSION['msg_type'] = "danger";
+        header("Location: admin_edit_user.php?id=" . $user_id);
+        exit;
     }
     $stmt->close();
 }
@@ -70,11 +74,30 @@ if (isset($_POST['update_user'])) {
         .edit-card { background: white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 30px; }
         .select2-container--default .select2-selection--single { height: 38px; border: 1px solid #dee2e6; display: flex; align-items: center; }
         .breadcrumb-item a { text-decoration: none; color: #2c3e50; }
+
+        /* ? ???-?? ?????????? */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
-<div class="container-fluid">
+<!-- ? ??????? ????? ????????? ????????? -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid fade-in">
     <div class="row">
         <div class="col-md-2 sidebar shadow">
             <h4>SCL DMS</h4>
@@ -106,38 +129,65 @@ if (isset($_POST['update_user'])) {
                 </ol>
             </nav>
 
+            <?php if(isset($_SESSION['msg'])): ?>
+                <?php 
+                    $toast_msg  = $_SESSION['msg'];
+                    $toast_type = isset($_SESSION['msg_type']) ? $_SESSION['msg_type'] : 'info';
+                    unset($_SESSION['msg']);
+                    unset($_SESSION['msg_type']);
+                ?>
+                <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        var toastEl   = document.getElementById('liveToast');
+                        var toastBody = document.getElementById('toastMessage');
+                        var closeBtn  = document.getElementById('toastCloseBtn');
+
+                        toastEl.classList.remove('bg-success','bg-danger','bg-warning','bg-info','text-white','text-dark');
+                        closeBtn.classList.remove('btn-close-white');
+
+                        if ('<?php echo $toast_type; ?>' === 'warning') {
+                            toastEl.classList.add('bg-warning', 'text-dark');
+                        } else {
+                            toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-white');
+                            closeBtn.classList.add('btn-close-white');
+                        }
+
+                        toastBody.innerHTML = "<?php echo addslashes($toast_msg); ?>";
+                        var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+                        toast.show();
+                    });
+                </script>
+            <?php endif; ?>
+
             <div class="row justify-content-center mt-3">
                 <div class="col-md-7">
                     <div class="edit-card">
                         <h4 class="mb-4 text-primary">
                             <i class="fas fa-user-edit me-2"></i> Edit User Information
                         </h4>
-                        
-                        <?php echo $message; ?>
 
                         <form method="POST">
                             <div class="row">
-                            
-                                  <div class="col-md-6 mb-3">
-                                      <label class="form-label">Title</label>
-                                      <select name="title" class="form-select" required>
-                                          <option value="">Select Title</option>
-                                          <option value="Mr" <?php echo (($user_data['title'] ?? '') == 'Mr') ? 'selected' : ''; ?>>Mr</option>
-                                          <option value="Mrs" <?php echo (($user_data['title'] ?? '') == 'Mrs') ? 'selected' : ''; ?>>Mrs</option>
-                                          <option value="Ms" <?php echo (($user_data['title'] ?? '') == 'Ms') ? 'selected' : ''; ?>>Ms</option>
-                                      </select>
-                                  </div>
-                                  <div class="col-md-6 mb-3">
-                                      <label class="form-label">Username</label>
-                                      <input type="text" name="username" class="form-control" 
-                                             value="<?php echo htmlspecialchars($user_data['username'] ?? ''); ?>" required>
-                                  </div>
-                              </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Email Address</label>
-                                    <input type="email" name="email" class="form-control" 
-                                           value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>" required>
+                                    <label class="form-label">Title</label>
+                                    <select name="title" class="form-select" required>
+                                        <option value="">Select Title</option>
+                                        <option value="Mr"  <?php echo (($user_data['title'] ?? '') == 'Mr')  ? 'selected' : ''; ?>>Mr</option>
+                                        <option value="Mrs" <?php echo (($user_data['title'] ?? '') == 'Mrs') ? 'selected' : ''; ?>>Mrs</option>
+                                        <option value="Ms"  <?php echo (($user_data['title'] ?? '') == 'Ms')  ? 'selected' : ''; ?>>Ms</option>
+                                    </select>
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Username</label>
+                                    <input type="text" name="username" class="form-control"
+                                           value="<?php echo htmlspecialchars($user_data['username'] ?? ''); ?>" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" name="email" class="form-control"
+                                       value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>" required>
                             </div>
 
                             <div class="mb-3">
@@ -145,7 +195,7 @@ if (isset($_POST['update_user'])) {
                                 <select name="department" class="form-select select2-dept" required>
                                     <option value="">Choose Department...</option>
                                     <?php foreach($departments as $dept): ?>
-                                        <option value="<?php echo $dept; ?>" 
+                                        <option value="<?php echo $dept; ?>"
                                             <?php echo (($user_data['department'] ?? '') == $dept) ? 'selected' : ''; ?>>
                                             <?php echo $dept; ?>
                                         </option>
@@ -156,16 +206,17 @@ if (isset($_POST['update_user'])) {
                             <div class="mb-3">
                                 <label class="form-label">User Role</label>
                                 <select name="role" class="form-select">
-                                    <option value="user" <?php echo ($user_data['user_role'] == 'user') ? 'selected' : ''; ?>>Normal User</option>
-                                    <option value="staff" <?php echo ($user_data['user_role'] == 'staff') ? 'selected' : ''; ?>>Staff (Semi-Admin)</option>
-                                    <option value="admin" <?php echo ($user_data['user_role'] == 'admin') ? 'selected' : ''; ?>>Super Admin</option>
+                                    <option value="user"     <?php echo ($user_data['user_role'] == 'user')     ? 'selected' : ''; ?>>Normal User</option>
+                                    <option value="staff"    <?php echo ($user_data['user_role'] == 'staff')    ? 'selected' : ''; ?>>Staff (Semi-Admin)</option>
+                                    <option value="approver" <?php echo ($user_data['user_role'] == 'approver') ? 'selected' : ''; ?>>Approver</option>
+                                    <option value="admin"    <?php echo ($user_data['user_role'] == 'admin')    ? 'selected' : ''; ?>>Super Admin</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
                                 <label class="form-label text-danger fw-bold">Change Password (Optional)</label>
                                 <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
-                                <small class="text-muted italic">Only fill this if you want to reset the user's password.</small>
+                                <small class="text-muted fst-italic">Only fill this if you want to reset the user's password.</small>
                             </div>
 
                             <div class="d-flex gap-2 border-top pt-3">
@@ -182,6 +233,7 @@ if (isset($_POST['update_user'])) {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>

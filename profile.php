@@ -15,9 +15,19 @@ if (!isset($_SESSION['UserName'])) {
 $user = $_SESSION['UserName'];   // এখানে username স্টোর করছ
 $role = $_SESSION['UserRole'] ?? 'user';
 
-$message = "";
+// Toast Message Variables
+$toast_msg = "";
+$toast_type = "info";
+
+// Handle Session Messages (From login forcing profile update)
 if (isset($_SESSION['msg'])) {
-    $message = $_SESSION['msg'];
+    $raw_msg = $_SESSION['msg'];
+    if (strpos($raw_msg, 'Profile Incomplete') !== false) {
+        $toast_msg = "Profile Incomplete! Please complete your profile.";
+        $toast_type = "warning";
+    } else {
+        $toast_msg = strip_tags($raw_msg);
+    }
     unset($_SESSION['msg']);   // একবার দেখানোর পর ক্লিয়ার
 }
 
@@ -56,7 +66,7 @@ if ($res && mysqli_num_rows($res) > 0) {
     $u['title']             = $row['title']             ?? 'Mr';
 }
 
-// 2) save
+// 2) save profile
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
 
     $full_name         = mysqli_real_escape_string($conn, $_POST['full_name']);
@@ -85,15 +95,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
     ";
 
     if (mysqli_query($conn, $upd)) {
+        // ✅ Profile complete show other page if not then only Profile page first
+        $_SESSION['force_profile_update'] = true;
+        
         header("Location: profile.php?updated=1");
         exit;
     } else {
-        $message = "<div class='alert alert-danger'>Error: ".mysqli_error($conn)."</div>";
+        $toast_msg = "Error updating profile: " . mysqli_error($conn);
+        $toast_type = "danger";
     }
 }
 
 if (isset($_GET['updated'])) {
-    $message = "<div class='alert alert-success'>Profile updated successfully.</div>";
+    $toast_msg = "Profile updated successfully! You can now use the dashboard.";
+    $toast_type = "success";
 }
 ?>
 <!DOCTYPE html>
@@ -104,16 +119,36 @@ if (isset($_GET['updated'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
         .sidebar { background: #1a2a3a; color: white; height: 100vh; position: fixed; width: 250px; padding: 20px; overflow-y: auto; z-index: 1000; }
         .content { margin-left: 250px; padding: 30px; }
         @media (max-width: 768px) {
             .sidebar { width: 100%; height: auto; position: relative; }
             .content { margin-left: 0; }
         }
+
+        /* ✅ বাউন্স অ্যানিমেশন (Bounce-in) */
+        .bounce-in {
+            animation: bounceIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.85); opacity: 0; }
+            50% { transform: scale(1.02); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body>
+
+<!-- ✅ ফ্লোটিং টোস্ট অ্যালার্ট কন্টেইনার -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast align-items-center border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold fs-6" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+        </div>
+    </div>
+</div>
 
 <div class="sidebar">
     <h4 class="mb-4 text-center"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
@@ -126,7 +161,6 @@ if (isset($_GET['updated'])) {
     <a href="guest_request.php" class="btn btn-outline-info w-100 mb-2 text-white"><i class="fas fa-paper-plane me-2"></i>Submit Request</a>
     <a href="my_requests.php" class="btn btn-outline-light w-100 mb-2"><i class="fas fa-list-alt me-2"></i>My Sent Requests</a>
     
-
     <?php if(in_array($role, ['admin', 'superadmin'])): ?>
         <a href="manage_requests.php" class="btn btn-outline-warning w-100 mb-2 position-relative text-white">
             <i class="fas fa-tasks me-2"></i>Manage All
@@ -140,17 +174,17 @@ if (isset($_GET['updated'])) {
     <div class="container-fluid">
         <div class="row justify-content-center">
             <div class="col-md-10 col-lg-8">
-                <div class="card shadow border-0">
+                <!-- ✅ অ্যানিমেশন ক্লাস যুক্ত করা হলো (bounce-in) -->
+                <div class="card shadow border-0 bounce-in">
                     <div class="card-header bg-dark text-white">
                         <h5 class="mb-0"><i class="fas fa-user-edit me-2"></i>My Profile</h5>
                     </div>
-                    <div class="card-body bg-white">
-                        <?php echo $message; ?>
+                    <div class="card-body bg-white p-4">
 
                         <form method="POST">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Title</label>
+                                    <label class="form-label fw-bold">Title</label>
                                     <select name="title" class="form-select" required>
                                         <option value="">Title</option>
                                         <option value="Mr"  <?php if($u['title']=='Mr')  echo 'selected'; ?>>Mr</option>
@@ -159,7 +193,7 @@ if (isset($_GET['updated'])) {
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Full Name *</label>
+                                    <label class="form-label fw-bold">Full Name *</label>
                                     <input type="text" name="full_name" class="form-control"
                                            value="<?php echo htmlspecialchars($u['full_name']); ?>" required>
                                 </div>
@@ -167,12 +201,12 @@ if (isset($_GET['updated'])) {
 
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Phone *</label>
+                                    <label class="form-label fw-bold">Phone *</label>
                                     <input type="text" name="phone" class="form-control"
                                            value="<?php echo htmlspecialchars($u['phone']); ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Email *</label>
+                                    <label class="form-label fw-bold">Email *</label>
                                     <input type="email" name="email" class="form-control"
                                            value="<?php echo htmlspecialchars($u['email']); ?>" required>
                                 </div>
@@ -180,12 +214,12 @@ if (isset($_GET['updated'])) {
 
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Designation</label>
+                                    <label class="form-label fw-bold">Designation</label>
                                     <input type="text" name="designation" class="form-control"
                                            value="<?php echo htmlspecialchars($u['designation']); ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Department</label>
+                                    <label class="form-label fw-bold">Department</label>
                                     <select name="department" class="form-select">
                                         <?php foreach($dept_list as $d): ?>
                                             <option value="<?php echo $d; ?>" <?php if($u['department']==$d) echo 'selected'; ?>>
@@ -198,24 +232,24 @@ if (isset($_GET['updated'])) {
 
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Emergency Contact</label>
+                                    <label class="form-label fw-bold">Emergency Contact</label>
                                     <input type="text" name="emergency_contact" class="form-control"
                                            value="<?php echo htmlspecialchars($u['emergency_contact']); ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">NID/Company ID</label>
+                                    <label class="form-label fw-bold">NID/Company ID *</label>
                                     <input type="text" name="id_proof" class="form-control"
-                                           value="<?php echo htmlspecialchars($u['id_proof']); ?>"required>
+                                           value="<?php echo htmlspecialchars($u['id_proof']); ?>" required>
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Address</label>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Address</label>
                                 <input type="text" name="address" class="form-control"
                                        value="<?php echo htmlspecialchars($u['address']); ?>">
                             </div>
 
-                            <button type="submit" name="save_profile" class="btn btn-primary w-100">
+                            <button type="submit" name="save_profile" class="btn btn-primary w-100 py-2 fs-5 fw-bold">
                                 <i class="fas fa-save me-2"></i>Save Profile
                             </button>
                         </form>
@@ -225,6 +259,42 @@ if (isset($_GET['updated'])) {
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ✅ Toast Trigger Script -->
+<?php if($toast_msg != ""): ?>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var toastEl = document.getElementById('liveToast');
+        var toastBody = document.getElementById('toastMessage');
+        var closeBtn = document.getElementById('toastCloseBtn');
+        
+        var type = '<?php echo $toast_type; ?>';
+        
+        // Remove old classes
+        toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white', 'text-dark');
+        closeBtn.classList.remove('btn-close-white');
+        
+        // Add new classes based on type
+        if (type === 'warning') {
+            toastEl.classList.add('bg-warning', 'text-dark');
+            toastBody.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> ' + "<?php echo addslashes($toast_msg); ?>";
+        } else if(type === 'success') {
+            toastEl.classList.add('bg-success', 'text-white');
+            closeBtn.classList.add('btn-close-white');
+            toastBody.innerHTML = '<i class="fas fa-check-circle me-2"></i> ' + "<?php echo addslashes($toast_msg); ?>";
+        } else {
+            toastEl.classList.add('bg-' + type, 'text-white');
+            closeBtn.classList.add('btn-close-white');
+            toastBody.innerHTML = '<i class="fas fa-info-circle me-2"></i> ' + "<?php echo addslashes($toast_msg); ?>";
+        }
+        
+        var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+        toast.show();
+    });
+</script>
+<?php endif; ?>
 
 </body>
 </html>

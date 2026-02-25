@@ -8,8 +8,8 @@ error_reporting(E_ALL);
 require_once('db.php');
 require_once('header.php');
 
-// Only admin
-if (!isset($_SESSION['UserName']) || $_SESSION['UserRole'] !== 'admin') {
+// ✅ Allow staff, admin, and superadmin to view this page
+if (!isset($_SESSION['UserName']) || !in_array($_SESSION['UserRole'], ['staff', 'admin', 'superadmin'])) {
     header("Location: index.php");
     exit;
 }
@@ -22,15 +22,13 @@ $total_rooms      = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c
 $available_rooms  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM rooms WHERE status='Available'"))['count'];
 $booked_rooms     = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM rooms WHERE status='Booked'"))['count'];
 $active_bookings  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM bookings WHERE status='Booked'"))['count'];
-$total_users      = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM users WHERE user_role != 'pending'"))['count'];
 $checkout_history = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM checked_out_guests"))['count'];
 
 // Fixed & VIP Room Stats
 $vip_rooms = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM rooms WHERE room_type LIKE '%VIP%'"))['count'];
 
-// Only NON-VIP Fixed Rooms (VIP ???? ???? ?????? ???????)
+// Only NON-VIP Fixed Rooms (VIP বাদে অন্য ফিক্সড রুমগুলো)
 $fixed_rooms = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM rooms WHERE is_fixed='Yes' AND room_type NOT LIKE '%VIP%'"))['count'];
-
 
 // Partial Booking Stats (Double room with only 1 guest booked)
 $partial_sql = "
@@ -45,16 +43,7 @@ $partial_rooms = mysqli_fetch_assoc(mysqli_query($conn, $partial_sql))['count'];
 $pending_requests = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM visit_requests WHERE status='Pending'"))['count'];
 $total_visit_reqs = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count FROM visit_requests"))['count'];
 
-// Who made how many requests (Group by User)
-$requester_sql = "SELECT requested_by, 
-                  COUNT(*) as total_req, 
-                  SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending_req 
-                  FROM visit_requests 
-                  GROUP BY requested_by 
-                  ORDER BY total_req DESC";
-$requester_result = mysqli_query($conn, $requester_sql);
-
-// Live Room Status Query (Now supports primary and secondary guests like index.php)
+// Live Room Status Query
 $rooms_sql = "SELECT r.*, b.guest_name, b.secondary_guest_name 
               FROM rooms r 
               LEFT JOIN bookings b 
@@ -68,7 +57,7 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Super Admin Panel - SCL DMS</title>
+<title>Staff Dashboard - SCL DMS</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
@@ -94,14 +83,7 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
     height: 100%;
 }
 .card-stat:hover { transform: translateY(-5px); }
-.card-stat::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-}
+.card-stat::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
 .bg-primary.card-stat::before { background: #0d6efd; }
 .bg-success.card-stat::before { background: #198754; }
 .bg-warning.card-stat::before { background: #ffc107; }
@@ -115,8 +97,6 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
 .bg-gold.card-stat::before { background: #fff; }
 .bg-indigo.card-stat { background-color: #6610f2; }
 .bg-indigo.card-stat::before { background: #520dc2; }
-
-/* New Partial Booking Color (Orange) */
 .bg-orange.card-stat { background-color: #fd7e14; }
 .bg-orange.card-stat::before { background: #d9660f; }
 
@@ -124,67 +104,25 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
 .stats-grid { gap: 20px; }
 .quick-actions { background: white; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
 
-/* Live Room Status cards (index.php style) */
+/* Live Room Status cards */
 .room-card { 
-    height: 220px; 
-    border-radius: 12px; 
-    color: white !important; 
-    text-align: center; 
-    padding: 15px; 
-    margin-bottom: 20px; 
-    transition: transform 0.3s ease, box-shadow 0.3s ease; 
-    position: relative; 
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; 
-    align-items: center;
+    height: 220px; border-radius: 12px; color: white !important; text-align: center; padding: 15px; margin-bottom: 20px; 
+    transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
 }
-.room-card:hover { 
-    transform: translateY(-4px); 
-    box-shadow: 0 10px 20px rgba(0,0,0,0.2); 
-    z-index: 10; 
-}
+.room-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 10; }
 .available-room { background: linear-gradient(135deg, #28a745, #20c997); }
 .booked-room    { background: linear-gradient(135deg, #dc3545, #fd7e14); }
-.room-card h4 { 
-    font-weight: 800; 
-    font-size: 1.4rem; 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3); 
-    margin-bottom: 2px; 
-}
-.status-text { 
-    text-transform: uppercase; 
-    font-size: 0.75rem; 
-    letter-spacing: 1px; 
-    margin-top: 5px; 
-    font-weight: bold; 
-    opacity: 0.9; 
-}
+.room-card h4 { font-weight: 800; font-size: 1.4rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); margin-bottom: 2px; }
+.status-text { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; margin-top: 5px; font-weight: bold; opacity: 0.9; }
 .guest-name-badge {
-    background: rgba(0,0,0,0.25); 
-    padding: 4px 10px; 
-    border-radius: 20px; 
-    font-size: 0.85rem; 
-    font-weight: 700;
-    margin-top: 5px; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-    max-width: 95%; 
-    display: inline-block; 
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: rgba(0,0,0,0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;
+    margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
-.vip-room {
-    background: linear-gradient(135deg, #b8860b, #ffd700, #fff9c4);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    color: #2c2100 !important;
-}
+.vip-room { background: linear-gradient(135deg, #b8860b, #ffd700, #fff9c4); box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.7); color: #2c2100 !important; }
 .bed-empty { opacity: 0.4; }
 
-/* ? ???-?? ?????????? */
+/* ✅ ফেড-ইন অ্যানিমেশন */
 .fade-in {
     animation: fadeIn 0.6s ease-in-out;
 }
@@ -196,7 +134,7 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
 </head>
 <body>
 
-<!-- ? ??????? ????? ????????? ????????? -->
+<!-- ✅ ফ্লোটিং টোস্ট অ্যালার্ট কন্টেইনার -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
     <div id="liveToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
@@ -207,17 +145,17 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
 </div>
 
 <div class="admin-sidebar">
-    <h4><i class="fas fa-hotel me-2"></i>SCL DMS Admin</h4>
+    <h4><i class="fas fa-hotel me-2"></i>SCL DMS Staff</h4>
     <hr>
     
     <div class="p-3 mb-4 bg-white bg-opacity-10 rounded text-center">
-        <small class="text-light d-block">Super Admin</small>
+        <small class="text-light d-block">Dashboard Access</small>
         <strong><?php echo htmlspecialchars($userName); ?></strong><br>
-        <span class="badge badge-role bg-warning text-dark"><?php echo strtoupper($userRole); ?></span>
+        <span class="badge badge-role bg-info text-dark"><?php echo strtoupper($userRole); ?></span>
     </div>
 
-    <a href="admin_dashboard.php" class="btn btn-primary w-100 mb-2 text-start active">
-        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+    <a href="staff_dashboard.php" class="btn btn-primary w-100 mb-2 text-start active">
+        <i class="fas fa-tachometer-alt me-2"></i> Staff Dashboard
     </a>
     
     <a href="manage_requests.php" class="btn btn-outline-warning w-100 mb-2 text-start text-white">
@@ -227,21 +165,24 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
         <?php endif; ?>
     </a>
 
-    <a href="admin_rooms.php" class="btn btn-outline-light w-100 mb-2 text-start">
-        <i class="fas fa-door-open me-2"></i> Manage Rooms
-    </a>
-    <a href="admin_users.php" class="btn btn-outline-light w-100 mb-2 text-start">
-        <i class="fas fa-users me-2"></i> Manage Users
-    </a>
     <a href="checkout_list.php" class="btn btn-outline-light w-100 mb-2 text-start">
         <i class="fas fa-clipboard-list me-2"></i> Active Bookings
     </a>
     <a href="checkout_history.php" class="btn btn-outline-light w-100 mb-2 text-start">
         <i class="fas fa-history me-2"></i> Checkout History
     </a>
+    
+    <!-- If User is an Admin, they can easily switch back to Admin Panel -->
+    <?php if(in_array($userRole, ['admin', 'superadmin'])): ?>
+        <hr class="my-3 border-light">
+        <a href="admin_dashboard.php" class="btn btn-outline-warning w-100 mb-2 text-start">
+            <i class="fas fa-crown me-2"></i> Admin Panel
+        </a>
+    <?php endif; ?>
+
     <hr class="my-3">
     <a href="index.php" class="btn btn-outline-light w-100 mb-2 text-start">
-        <i class="fas fa-user-circle me-2"></i> User Dashboard
+        <i class="fas fa-home me-2"></i> Main Booking Page
     </a>
     <a href="logout.php" class="btn btn-danger w-100 mt-3">
         <i class="fas fa-sign-out-alt me-2"></i> Logout
@@ -351,100 +292,19 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
             </div>
         </div>
     </div>
-    
-    
-    <!-- User Request Statistics + Users/History -->
-    <div class="row mt-4">
-        <div class="col-lg-7">
-            <div class="card quick-actions p-4 h-100">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0"><i class="fas fa-chart-bar text-primary me-2"></i>User Request Statistics</h5>
-                    <a href="manage_requests.php" class="btn btn-sm btn-primary">View All</a>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>User Name</th>
-                                <th class="text-center">Total Requests</th>
-                                <th class="text-center">Pending</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            if(mysqli_num_rows($requester_result) > 0) {
-                                while($row = mysqli_fetch_assoc($requester_result)): 
-                            ?>
-                            <tr>
-                                <td class="fw-bold"><?php echo htmlspecialchars($row['requested_by']); ?></td>
-                                <td class="text-center"><span class="badge bg-secondary"><?php echo $row['total_req']; ?></span></td>
-                                <td class="text-center">
-                                    <?php if($row['pending_req'] > 0): ?>
-                                        <span class="badge bg-danger"><?php echo $row['pending_req']; ?></span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end">
-                                    <a href="manage_requests.php" class="btn btn-sm btn-outline-info"><i class="fas fa-eye"></i></a>
-                                </td>
-                            </tr>
-                            <?php 
-                                endwhile; 
-                            } else {
-                                echo "<tr><td colspan='4' class='text-center text-muted'>No requests found.</td></tr>";
-                            }
-                            ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
 
-        <div class="col-lg-5">
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="card quick-actions p-4">
-                        <h5><i class="fas fa-users text-primary me-2"></i>Total Users</h5>
-                        <h3 class="text-success"><?php echo $total_users; ?></h3>
-                        <a href="admin_users.php" class="btn btn-outline-primary mt-2 w-100">Manage Users</a>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="card quick-actions p-4">
-                        <h5><i class="fas fa-history text-info me-2"></i>Checkout History</h5>
-                        <h3 class="text-info"><?php echo $checkout_history; ?></h3>
-                        <a href="checkout_history.php" class="btn btn-outline-info mt-2 w-100">View History</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Admin Actions -->
+    <!-- Quick Staff Actions -->
     <div class="row mt-4">
-        <div class="col-12">
+        <div class="col-lg-6">
             <div class="card quick-actions p-4">
-                <h4 class="mb-3">Quick Admin Actions</h4>
+                <h4 class="mb-3">Quick Staff Actions</h4>
                 <div class="row">
-                    <div class="col-md-3 mb-2">
-                        <a href="admin_rooms.php" class="btn btn-outline-primary w-100 h-100 p-3">
-                            <i class="fas fa-door-open fa-2x d-block mb-2"></i>Rooms
-                        </a>
-                    </div>
-                    <div class="col-md-3 mb-2">
-                        <a href="admin_users.php" class="btn btn-outline-secondary w-100 h-100 p-3">
-                            <i class="fas fa-users fa-2x d-block mb-2"></i>Users
-                        </a>
-                    </div>
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-6 mb-2">
                         <a href="checkout_list.php" class="btn btn-outline-warning w-100 h-100 p-3">
                             <i class="fas fa-clipboard-list fa-2x d-block mb-2"></i>Checkouts
                         </a>
                     </div>
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-6 mb-2">
                         <a href="checkout_history.php" class="btn btn-outline-info w-100 h-100 p-3">
                             <i class="fas fa-history fa-2x d-block mb-2"></i>History
                         </a>
@@ -452,9 +312,16 @@ $rooms_result = mysqli_query($conn, $rooms_sql);
                 </div>
             </div>
         </div>
+        <div class="col-lg-6">
+            <div class="card quick-actions p-4">
+                <h5><i class="fas fa-history text-info me-2"></i>Checkout History Summary</h5>
+                <h3 class="text-info mt-2"><?php echo $checkout_history; ?> Total</h3>
+                <a href="checkout_history.php" class="btn btn-outline-info mt-3 w-100">View History Details</a>
+            </div>
+        </div>
     </div>
 
-    <!-- ? LIVE ROOM STATUS (Dynamic) -->
+    <!-- ✅ LIVE ROOM STATUS (Dynamic) -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card quick-actions p-4">

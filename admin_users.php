@@ -12,17 +12,20 @@ if (!isset($_SESSION['UserName']) || $_SESSION['UserRole'] !== 'admin') {
 $userName = $_SESSION['UserName'];
 $userRole = $_SESSION['UserRole'];
 
-$message = "";
 $department_list = ["ICT", "HR & Admin", "Accounts & Finance", "Sales & Marketing", "Supply Chain", "Production", "Civil Engineering", "Electrical", "Mechanical", "Glazeline", "Laboratory & Quality Control", "Power & Generation", "Press", "Sorting & Packing", "Squaring & Polishing", "VAT", "Kiln", "Inventory", "Audit", "Brand"];
 
 // Delete user
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     if (mysqli_query($conn, "DELETE FROM users WHERE id = $id")) {
-        $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> User deleted successfully!</div>";
+        $_SESSION['msg'] = "User deleted successfully!";
+        $_SESSION['msg_type'] = "success";
     } else {
-        $message = "<div class='alert alert-danger'><i class='fas fa-exclamation-triangle'></i> Delete failed: ".mysqli_error($conn)."</div>";
+        $_SESSION['msg'] = "Delete failed: ".mysqli_error($conn);
+        $_SESSION['msg_type'] = "danger";
     }
+    header("Location: admin_users.php");
+    exit;
 }
 
 // Add user with Validation & Mail Notification (Same logic as Register page)
@@ -35,27 +38,32 @@ if (isset($_POST['add_user'])) {
 
     // Validation Regex
     $userRegex = '/^(?=(?:.*[a-zA-Z]){2})(?=.*[0-9])[a-zA-Z0-9]+$/';
-    $emailRegex = '/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/';
-    $passComplexRegex = '/^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\\W_]).+$/';
+    $emailRegex = '/^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$/';
+    $passComplexRegex = '/^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\\\\W_]).+$/';
 
     // 1. Check Empty
     if (empty($u_name) || empty($u_email) || empty($u_pass_plain) || empty($u_dept)) {
-        $message = "<div class='alert alert-danger'>?? All fields are required!</div>";
+        $_SESSION['msg'] = "All fields are required!";
+        $_SESSION['msg_type'] = "danger";
     } 
     // 2. Check Username Format
     elseif (!preg_match($userRegex, $u_name)) {
-        $message = "<div class='alert alert-danger'>? Invalid Username! Need 2 letters & 1 number (No spaces).</div>";
+        $_SESSION['msg'] = "Invalid Username! Need 2 letters & 1 number (No spaces).";
+        $_SESSION['msg_type'] = "warning";
     }
     // 3. Check Email Format & Domain
     elseif (!preg_match($emailRegex, $u_email)) {
-        $message = "<div class='alert alert-danger'>? Invalid Email Format!</div>";
+        $_SESSION['msg'] = "Invalid Email Format!";
+        $_SESSION['msg_type'] = "warning";
     }
-    elseif (!preg_match('/@(sheltech-bd|sheltechceramics)\\./i', $u_email)) {
-        $message = "<div class='alert alert-danger'>? Email domain must be @sheltech-bd or @sheltechceramics!</div>";
+    elseif (!preg_match('/@(sheltech-bd|sheltechceramics)\\\\./i', $u_email)) {
+        $_SESSION['msg'] = "Email domain must be @sheltech-bd or @sheltechceramics!";
+        $_SESSION['msg_type'] = "warning";
     }
     // 4. Check Password Complexity
     elseif (!preg_match($passComplexRegex, $u_pass_plain)) {
-        $message = "<div class='alert alert-danger'>? Weak Password! Must contain Letter, Number & Symbol (@, # etc).</div>";
+        $_SESSION['msg'] = "Weak Password! Must contain Letter, Number & Symbol (@, # etc).";
+        $_SESSION['msg_type'] = "warning";
     }
     else {
         // 5. Check Duplicate
@@ -66,12 +74,11 @@ if (isset($_POST['add_user'])) {
         $res_check = mysqli_stmt_get_result($stmt_check);
 
         if (mysqli_num_rows($res_check) > 0) {
-            $message = "<div class='alert alert-danger'>? Username or Email already exists!</div>";
+            $_SESSION['msg'] = "Username or Email already exists!";
+            $_SESSION['msg_type'] = "danger";
         } else {
             // All Good - Insert
             $u_pass_hash = password_hash($u_pass_plain, PASSWORD_DEFAULT);
-            // Admin created users are auto-verified (confirm_token = NULL or 'verified')
-            // Using 'admin_created' as token to signify auto-verification if needed
             
             $sql_insert = "INSERT INTO users (username, password, email, department, user_role, created_at, confirm_token) 
                            VALUES (?, ?, ?, ?, ?, NOW(), 'verified')";
@@ -100,12 +107,16 @@ if (isset($_POST['add_user'])) {
                 
                 @mail($u_email, $subject, $msg, $headers);
                 
-                $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> New user added & mail sent!</div>";
+                $_SESSION['msg'] = "New user added & mail sent!";
+                $_SESSION['msg_type'] = "success";
             } else {
-                $message = "<div class='alert alert-danger'>? Database Error: " . mysqli_error($conn) . "</div>";
+                $_SESSION['msg'] = "Database Error: " . mysqli_error($conn);
+                $_SESSION['msg_type'] = "danger";
             }
         }
     }
+    header("Location: admin_users.php");
+    exit;
 }
 
 // ? Handle Role Update (Quick Update)
@@ -125,8 +136,14 @@ if (isset($_POST['update_role_btn'])) {
         $msg = "Dear $u_name,\r\n\r\nYour account role has been updated to: ".ucfirst($new_role).".\r\nYou now have updated privileges in the system.\r\n\r\nRegards,\r\nAdmin Team";
         
         @mail($u_email, $subject, $msg, $headers);
-        $message = "<div class='alert alert-success'><i class='fas fa-info-circle'></i> Role updated & notification sent!</div>";
+        $_SESSION['msg'] = "Role updated & notification sent!";
+        $_SESSION['msg_type'] = "success";
+    } else {
+        $_SESSION['msg'] = "Failed to update role!";
+        $_SESSION['msg_type'] = "danger";
     }
+    header("Location: admin_users.php");
+    exit;
 }
 
 $users = mysqli_query($conn, "SELECT * FROM users ORDER BY id DESC");
@@ -156,11 +173,30 @@ body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
 .role-approver { background-color: #def7ec; color: #03543f; } 
 .role-user { background-color: #f3f4f6; color: #374151; }
 .badge-role { font-size: 0.75rem; padding: 4px 8px; border-radius: 10px; }
+
+/* ? ???-?? ?????????? */
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 </style>
 </head>
 <body>
 
-<div class="container-fluid">
+<!-- ? ??????? ????? ????????? ????????? -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="liveToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid fade-in">
 <div class="row">
     <div class="col-md-2 sidebar">
         <h4>SCL DMS</h4>
@@ -183,9 +219,40 @@ body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
     </div>
 
     <div class="col-md-10 p-4">
+        
+        <?php if(isset($_SESSION['msg'])): ?>
+            <?php 
+                $toast_msg = $_SESSION['msg'];
+                $toast_type = isset($_SESSION['msg_type']) ? $_SESSION['msg_type'] : 'info';
+                
+                unset($_SESSION['msg']);
+                unset($_SESSION['msg_type']);
+            ?>
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    var toastEl = document.getElementById('liveToast');
+                    var toastBody = document.getElementById('toastMessage');
+                    var closeBtn = document.getElementById('toastCloseBtn');
+                    
+                    toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white', 'text-dark');
+                    closeBtn.classList.remove('btn-close-white');
+                    
+                    if ('<?php echo $toast_type; ?>' === 'warning') {
+                        toastEl.classList.add('bg-warning', 'text-dark');
+                    } else {
+                        toastEl.classList.add('bg-<?php echo $toast_type; ?>', 'text-white');
+                        closeBtn.classList.add('btn-close-white');
+                    }
+                    
+                    toastBody.innerHTML = "<?php echo addslashes($toast_msg); ?>";
+                    var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+                    toast.show();
+                });
+            </script>
+        <?php endif; ?>
+
         <h3>User Management</h3>
         <hr>
-        <?php echo $message; ?>
 
         <div class="row">
             <div class="col-md-4">
@@ -306,5 +373,6 @@ body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
 </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

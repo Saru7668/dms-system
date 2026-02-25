@@ -17,6 +17,10 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// ✅ Toast Message Handling
+$toast_msg = "";
+$toast_type = "";
+
 // --- DELETE LOGIC (Only Admin) ---
 if (isset($_GET['delete']) && $_GET['delete'] == '1' && isset($_GET['id']) && isset($_GET['csrf'])) {
     
@@ -57,41 +61,57 @@ if (isset($_GET['delete']) && $_GET['delete'] == '1' && isset($_GET['id']) && is
     exit;
 }
 
-// ✅ FILTERS: DATE RANGE + ROOM NUMBER
+// Catch redirection messages for Toast
+if(isset($_GET['deleted']) && $_GET['deleted'] == '1') {
+    $toast_msg = "Record deleted successfully!";
+    $toast_type = "success";
+} elseif(isset($_GET['error'])) {
+    if($_GET['error'] == 'access_denied') {
+        $toast_msg = "Access Denied! Only Admin can delete records.";
+        $toast_type = "danger";
+    } elseif($_GET['error'] == 'delete_failed') {
+        $toast_msg = "Failed to delete record.";
+        $toast_type = "danger";
+    }
+}
+
+// ✅ FILTERS: DATE RANGE + ROOM + GUEST NAME + REF NO
 $from_date = isset($_GET['from_date']) ? trim($_GET['from_date']) : '';
 $to_date = isset($_GET['to_date']) ? trim($_GET['to_date']) : '';
 $room_filter = isset($_GET['room']) ? trim($_GET['room']) : '';
+$guest_filter = isset($_GET['guest_name']) ? trim($_GET['guest_name']) : '';
+$ref_filter = isset($_GET['ref_no']) ? trim($_GET['ref_no']) : '';
 
-// Validate room format
 if (!empty($room_filter) && !preg_match('/^[A-Z0-9-]+$/i', $room_filter)) {
     $room_filter = '';
 }
 
-// Build WHERE clause with prepared statement parameters
+// Build WHERE clause
 $where_conditions = [];
-$params = [];
-$types = "";
 
+// Date Filter
 if (!empty($from_date) && !empty($to_date)) {
-    $where_conditions[] = "DATE(cog.check_out_date) BETWEEN ? AND ?";
-    $params[] = $from_date;
-    $params[] = $to_date;
-    $types .= "ss";
+    $where_conditions[] = "DATE(cog.check_out_date) BETWEEN '" . mysqli_real_escape_string($conn, $from_date) . "' AND '" . mysqli_real_escape_string($conn, $to_date) . "'";
 } elseif (!empty($from_date)) {
-    $where_conditions[] = "DATE(cog.check_out_date) >= ?";
-    $params[] = $from_date;
-    $types .= "s";
+    $where_conditions[] = "DATE(cog.check_out_date) >= '" . mysqli_real_escape_string($conn, $from_date) . "'";
 } elseif (!empty($to_date)) {
-    $where_conditions[] = "DATE(cog.check_out_date) <= ?";
-    $params[] = $to_date;
-    $types .= "s";
+    $where_conditions[] = "DATE(cog.check_out_date) <= '" . mysqli_real_escape_string($conn, $to_date) . "'";
 }
 
-// Room filter
+// Room Filter
 if (!empty($room_filter)) {
-    $where_conditions[] = "cog.room_number = ?";
-    $params[] = $room_filter;
-    $types .= "s";
+    $where_conditions[] = "cog.room_number = '" . mysqli_real_escape_string($conn, $room_filter) . "'";
+}
+
+// Guest Filter
+if (!empty($guest_filter)) {
+    $guest_esc = mysqli_real_escape_string($conn, $guest_filter);
+    $where_conditions[] = "(cog.guest_name LIKE '%$guest_esc%' OR b.secondary_guest_name LIKE '%$guest_esc%')";
+}
+
+// Ref Filter
+if (!empty($ref_filter)) {
+    $where_conditions[] = "b.request_ref_id = '" . mysqli_real_escape_string($conn, $ref_filter) . "'";
 }
 
 $where_clause = "";
@@ -99,23 +119,23 @@ if (count($where_conditions) > 0) {
     $where_clause = "WHERE " . implode(" AND ", $where_conditions);
 }
 
-// ✅ QUERY with prepared statement
+// ✅ QUERY
 $sql = "SELECT cog.*, 
                b.arrival_time, 
                b.guest_email as primary_email, 
                b.secondary_guest_email as sec_email_booking,
-               b.secondary_guest_phone as sec_phone_booking
+               b.secondary_guest_phone as sec_phone_booking,
+               b.request_ref_id
         FROM checked_out_guests cog 
         LEFT JOIN bookings b ON cog.booking_id = b.id 
         $where_clause
         ORDER BY cog.check_out_date DESC";
 
-$stmt = mysqli_prepare($conn, $sql);
-if (!empty($params)) {
-    mysqli_stmt_bind_param($stmt, $types, ...$params);
-}
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
+$result = mysqli_query($conn, $sql);
+
+// ✅ Auto Shuffle Animation Logic
+$animations = ['anim-bounce', 'anim-zoom', 'anim-fade'];
+$selected_anim = $animations[array_rand($animations)];
 ?>
 
 <!DOCTYPE html>
@@ -127,147 +147,148 @@ $result = mysqli_stmt_get_result($stmt);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
         .header { text-align: center; background: linear-gradient(135deg, #224895, #2f6b96); color: white; padding: 30px; }
         .table-container { max-height: 70vh; overflow: auto; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .delete-btn { color: #dc3545; font-size: 1.2rem; transition: all 0.3s; cursor: pointer; }
         .delete-btn:hover { color: #b02a37; transform: scale(1.2); }
         .time-badge { font-weight: 500; font-size: 0.85em; }
-        .phone-btn { font-size: 1rem; }
         .sec-tag { font-size: 0.72rem; }
         .email-text { font-size: 0.8rem; color: #555; display: block; margin-top: 2px;}
         .details-text { font-size: 0.8rem; color: #555; display: block; line-height: 1.3; }
         .details-icon { font-size: 0.75rem; width: 15px; text-align: center; color: #888; margin-right: 3px; }
         .call-link { text-decoration: none; color: inherit; transition: color 0.2s; }
         .call-link:hover { color: #198754; text-decoration: underline; }
+
+        /* ✅ Auto Shuffle Animations */
+        .anim-bounce { animation: bounceIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+        .anim-zoom { animation: zoomIn 0.6s ease-out both; }
+        .anim-fade { animation: fadeIn 0.8s ease-out both; }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.85); opacity: 0; }
+            50% { transform: scale(1.02); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes zoomIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
+
+    <!-- ✅ Floating Toast Alert Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+        <div id="liveToast" class="toast align-items-center border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold fs-6" id="toastMessage"></div>
+                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" id="toastCloseBtn"></button>
+            </div>
+        </div>
+    </div>
 
     <div class="header shadow">
         <div class="container">
             <h2><i class="fas fa-history me-3"></i>Checkout History</h2>
             <p class="lead mb-0">Complete guest checkout records</p>
             
-            <!-- DATE RANGE + ROOM FILTER FORM -->
+            <!-- ✅ ENHANCED FILTER FORM -->
             <div class="card bg-white text-dark mt-4 shadow">
                 <div class="card-body">
-                    <form method="GET" class="row g-3 align-items-end">
+                    <form method="GET" action="checkout_history.php" class="row g-3 align-items-end mb-3">
                         <div class="col-md-2">
-                            <label class="form-label fw-bold"><i class="fas fa-door-open me-2"></i>Room No</label>
-                            <input type="text" name="room" class="form-control" placeholder="e.g. 2A" value="<?php echo htmlspecialchars($room_filter, ENT_QUOTES, 'UTF-8'); ?>">
+                            <label class="form-label fw-bold"><i class="fas fa-hashtag me-2"></i>Ref No</label>
+                            <input type="text" name="ref_no" class="form-control" placeholder="e.g. 1024" value="<?php echo htmlspecialchars($ref_filter, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-2"></i>From Date</label>
+                            <label class="form-label fw-bold"><i class="fas fa-user me-2"></i>Guest Name</label>
+                            <input type="text" name="guest_name" class="form-control" placeholder="Search by name" value="<?php echo htmlspecialchars($guest_filter, ENT_QUOTES, 'UTF-8'); ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold"><i class="fas fa-door-open me-2"></i>Room</label>
+                            <input type="text" name="room" class="form-control" placeholder="e.g. 101" value="<?php echo htmlspecialchars($room_filter, ENT_QUOTES, 'UTF-8'); ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-2"></i>From</label>
                             <input type="date" name="from_date" class="form-control" value="<?php echo htmlspecialchars($from_date, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-2"></i>To Date</label>
                             <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($to_date, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-filter me-2"></i>Filter
-                            </button>
-                        </div>
-                        <div class="col-md-2">
-                            <a href="checkout_history.php" class="btn btn-secondary w-100">
-                                <i class="fas fa-redo me-2"></i>Reset
-                            </a>
+
+                        <!-- BUTTONS ROW -->
+                        <div class="col-md-12">
+                            <div class="row g-2 align-items-center mt-2">
+                                <?php 
+                                $export_params = http_build_query([
+                                    'from_date' => $from_date, 
+                                    'to_date' => $to_date,
+                                    'room' => $room_filter,
+                                    'guest_name' => $guest_filter,
+                                    'ref_no' => $ref_filter
+                                ]);
+                                ?>
+                                <div class="col-md-4">
+                                    <a href="export_history_pdf.php?<?php echo $export_params; ?>" class="btn btn-danger w-100 shadow-sm" target="_blank">
+                                        <i class="fas fa-file-pdf me-2"></i>PDF
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="export_history_excel.php?<?php echo $export_params; ?>" class="btn btn-success w-100 shadow-sm">
+                                        <i class="fas fa-file-excel me-2"></i>Excel
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100 shadow-sm">
+                                        <i class="fas fa-search me-2"></i>Search
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="checkout_history.php" class="btn btn-secondary w-100 shadow-sm">
+                                        <i class="fas fa-redo me-2"></i>Reset
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </form>
-
-                    <!-- EXPORT BUTTONS ROW -->
-                    <div class="row mt-3 g-2">
-                        <?php 
-                        $export_params = http_build_query([
-                            'from_date' => $from_date, 
-                            'to_date' => $to_date,
-                            'room' => $room_filter
-                        ]);
-                        ?>
-                        <div class="col-md-6">
-                            <a href="export_history_pdf.php?<?php echo $export_params; ?>" class="btn btn-danger w-100 btn-lg shadow" target="_blank">
-                                <i class="fas fa-file-pdf me-2"></i>Export to PDF
-                            </a>
-                        </div>
-                        <div class="col-md-6">
-                            <a href="export_history_excel.php?<?php echo $export_params; ?>" class="btn btn-success w-100 btn-lg shadow">
-                                <i class="fas fa-file-excel me-2"></i>Export to Excel
-                            </a>
-                        </div>
-                    </div>
                 </div>
             </div>
 
             <?php if($result && mysqli_num_rows($result) > 0): ?>
                 <div class="mt-3">
-                    <span class="badge bg-light text-dark fs-6 px-3 py-2">
+                    <span class="badge bg-light text-dark fs-6 px-3 py-2 shadow-sm">
                         <i class="fas fa-list me-2"></i><?php echo mysqli_num_rows($result); ?> Records
                     </span>
-                    <?php if(!empty($room_filter)): ?>
-                        <span class="badge bg-info text-dark fs-6 px-3 py-2 ms-2">
-                            <i class="fas fa-door-open me-2"></i>Room: <?php echo htmlspecialchars($room_filter, ENT_QUOTES, 'UTF-8'); ?>
-                        </span>
+                    <?php if(!empty($ref_filter)): ?>
+                        <span class="badge bg-primary fs-6 px-3 py-2 ms-2 shadow-sm">Ref: <?php echo htmlspecialchars($ref_filter, ENT_QUOTES, 'UTF-8'); ?></span>
                     <?php endif; ?>
-                    <?php if(!empty($from_date) || !empty($to_date)): ?>
-                        <span class="badge bg-warning text-dark fs-6 px-3 py-2 ms-2">
-                            <i class="fas fa-calendar-check me-2"></i>
-                            <?php 
-                            if(!empty($from_date) && !empty($to_date)) {
-                                echo date('d M Y', strtotime($from_date)) . ' to ' . date('d M Y', strtotime($to_date));
-                            } elseif(!empty($from_date)) {
-                                echo 'From: ' . date('d M Y', strtotime($from_date));
-                            } else {
-                                echo 'Until: ' . date('d M Y', strtotime($to_date));
-                            }
-                            ?>
-                        </span>
+                    <?php if(!empty($guest_filter)): ?>
+                        <span class="badge bg-secondary fs-6 px-3 py-2 ms-2 shadow-sm">Guest: <?php echo htmlspecialchars($guest_filter, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
+                    <?php if(!empty($room_filter)): ?>
+                        <span class="badge bg-info text-dark fs-6 px-3 py-2 ms-2 shadow-sm">Room: <?php echo htmlspecialchars($room_filter, ENT_QUOTES, 'UTF-8'); ?></span>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 
-    <div class="container mt-5">
-        <?php if(isset($_GET['deleted'])): ?>
-            <div class="alert alert-success alert-dismissible fade show">
-                <i class="fas fa-trash-alt me-2"></i>Record deleted successfully!
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if(isset($_GET['error']) && $_GET['error'] == 'access_denied'): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <i class="fas fa-ban me-2"></i>Access Denied! Only Admin can delete records.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if(isset($_GET['error']) && $_GET['error'] == 'delete_failed'): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <i class="fas fa-exclamation-triangle me-2"></i>Failed to delete record.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
+    <!-- ✅ Apply Auto Shuffle Animation Here -->
+    <div class="container mt-4 <?php echo $selected_anim; ?>">
+        
         <?php if(!$result || mysqli_num_rows($result) == 0): ?>
             <div class="row justify-content-center">
-                <div class="col-md-8 text-center py-5">
-                    <i class="fas fa-inbox fa-5x text-muted mb-4"></i>
-                    <h4 class="text-muted">No Checkout Records</h4>
-                    <p class="text-muted mb-4">
-                        <?php 
-                        if (!empty($room_filter)) {
-                            echo 'No records found for Room ' . htmlspecialchars($room_filter, ENT_QUOTES, 'UTF-8') . '.';
-                        } elseif (!empty($from_date) || !empty($to_date)) {
-                            echo 'No records found for selected date range.';
-                        } else {
-                            echo 'Complete checkouts from Active Bookings to see history.';
-                        }
-                        ?>
-                    </p>
-                    <a href="checkout_list.php" class="btn btn-primary btn-lg">
+                <div class="col-md-8 text-center py-5 bg-white rounded shadow-sm">
+                    <i class="fas fa-search bg-light p-4 rounded-circle fa-3x text-muted mb-4 shadow-sm"></i>
+                    <h4 class="text-muted fw-bold">No Checkout Records Found</h4>
+                    <p class="text-muted mb-4">Try adjusting your search filters or check active bookings.</p>
+                    <a href="checkout_list.php" class="btn btn-primary btn-lg px-4 shadow-sm">
                         <i class="fas fa-clipboard-list me-2"></i>Active Bookings
                     </a>
                 </div>
@@ -282,7 +303,7 @@ $result = mysqli_stmt_get_result($stmt);
                             </h5>
                         </div>
                         <div class="col-md-4 text-end">
-                            <a href="checkout_list.php" class="btn btn-outline-primary btn-sm">
+                            <a href="checkout_list.php" class="btn btn-outline-primary btn-sm fw-bold shadow-sm">
                                 <i class="fas fa-plus me-1"></i>New Checkout
                             </a>
                         </div>
@@ -293,7 +314,7 @@ $result = mysqli_stmt_get_result($stmt);
                         <thead class="table-dark sticky-top">
                             <tr>
                                 <th width="40">#</th>
-                                <th>Guest(s)</th>
+                                <th>Guest(s) & Details</th>
                                 <th>Contact Info</th>
                                 <th>Room</th>
                                 <th>Check-in</th>
@@ -307,14 +328,19 @@ $result = mysqli_stmt_get_result($stmt);
                         </thead>
                         <tbody>
                             <?php $sl = 1; while($row = mysqli_fetch_assoc($result)): 
-                                // Safe Email Retrieval
+                            
+                                $guestTitle  = htmlspecialchars($row['guest_title'] ?? '', ENT_QUOTES, 'UTF-8');
+                                $guestName   = htmlspecialchars($row['guest_name']  ?? '', ENT_QUOTES, 'UTF-8');
+                                $displayName = trim($guestTitle . ' ' . $guestName);
+                            
+                                $secTitle    = htmlspecialchars($row['secondary_guest_title'] ?? '', ENT_QUOTES, 'UTF-8');
+                                $secName     = htmlspecialchars($row['secondary_guest_name']  ?? '', ENT_QUOTES, 'UTF-8');
+                                $secDispName = trim($secTitle . ' ' . $secName);
+                                
                                 $pEmail = !empty($row['primary_email']) ? $row['primary_email'] : 'N/A';
                                 $sEmail = !empty($row['secondary_guest_email']) ? $row['secondary_guest_email'] : (!empty($row['sec_email_booking']) ? $row['sec_email_booking'] : '');
-
-                                // Safe Phone Retrieval
                                 $secPhone = !empty($row['secondary_guest_phone']) ? $row['secondary_guest_phone'] : (!empty($row['sec_phone_booking']) ? $row['sec_phone_booking'] : '');
                                 
-                                // Safe Fields
                                 $desig    = isset($row['designation']) ? $row['designation'] : '';
                                 $addr     = isset($row['address']) ? $row['address'] : '';
                                 $secDesig = isset($row['secondary_guest_designation']) ? $row['secondary_guest_designation'] : '';
@@ -324,8 +350,13 @@ $result = mysqli_stmt_get_result($stmt);
                                 <td class="fw-bold"><?php echo $sl++; ?></td>
                                 
                                 <td>
+                                    <!-- ✅ Reference Number -->
+                                    <?php if(!empty($row['request_ref_id'])): ?>
+                                        <span class="badge bg-secondary mb-1 shadow-sm"><i class="fas fa-hashtag me-1"></i>Ref: <?php echo htmlspecialchars($row['request_ref_id']); ?></span><br>
+                                    <?php endif; ?>
+
                                     <!-- Primary Guest Name -->
-                                    <div class="fw-bold text-primary"><?php echo htmlspecialchars($row['guest_name'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="fw-bold text-primary fs-6"><?php echo $displayName; ?></div>
                                     
                                     <!-- Primary Designation & Address -->
                                     <?php if($desig): ?>
@@ -336,14 +367,16 @@ $result = mysqli_stmt_get_result($stmt);
                                     <?php endif; ?>
                                     
                                     <?php if(!empty($row['id_proof'])): ?>
-                                        <small class="text-muted d-block mt-1">ID: <?php echo htmlspecialchars($row['id_proof'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                        <small class="text-muted d-block mt-1"><i class="fas fa-id-card details-icon"></i> ID: <?php echo htmlspecialchars($row['id_proof'], ENT_QUOTES, 'UTF-8'); ?></small>
                                     <?php endif; ?>
 
                                     <!-- Secondary Guest -->
                                     <?php if(!empty($row['secondary_guest_name'])): ?>
                                         <div class="mt-2 pt-2 border-top">
-                                            <span class="badge bg-info text-dark sec-tag">Secondary</span>
-                                            <span class="ms-1 fw-semibold"><?php echo htmlspecialchars($row['secondary_guest_name'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                            <span class="badge bg-info text-dark sec-tag shadow-sm">Secondary</span>
+                                            <span class="ms-1 fw-semibold">
+                                                <?php echo $secDispName; ?>
+                                            </span>
                                             
                                             <?php if($secDesig): ?>
                                                 <span class="details-text mt-1 ms-1"><i class="fas fa-briefcase details-icon"></i> <?php echo htmlspecialchars($secDesig, ENT_QUOTES, 'UTF-8'); ?></span>
@@ -357,8 +390,7 @@ $result = mysqli_stmt_get_result($stmt);
 
                                 <td>
                                     <div>
-                                        <!-- Clickable Phone Link (Primary) -->
-                                        <a href="tel:<?php echo htmlspecialchars($row['phone'], ENT_QUOTES, 'UTF-8'); ?>" class="call-link" title="Call">
+                                        <a href="tel:<?php echo htmlspecialchars($row['phone'], ENT_QUOTES, 'UTF-8'); ?>" class="call-link fw-bold" title="Call">
                                             <i class="fas fa-phone text-success me-1"></i> <?php echo htmlspecialchars($row['phone'], ENT_QUOTES, 'UTF-8'); ?>
                                         </a>
 
@@ -370,11 +402,11 @@ $result = mysqli_stmt_get_result($stmt);
                                     <?php if(!empty($row['secondary_guest_name'])): ?>
                                         <div class="mt-2 pt-2 border-top">
                                             <?php if(!empty($secPhone)): ?>
-                                                <a href="tel:<?php echo htmlspecialchars($secPhone, ENT_QUOTES, 'UTF-8'); ?>" class="call-link" title="Call">
-                                                    <i class="fas fa-phone text-success me-1"></i> <?php echo htmlspecialchars($secPhone, ENT_QUOTES, 'UTF-8'); ?> (Sec)
+                                                <a href="tel:<?php echo htmlspecialchars($secPhone, ENT_QUOTES, 'UTF-8'); ?>" class="call-link fw-bold" title="Call">
+                                                    <i class="fas fa-phone text-success me-1"></i> <?php echo htmlspecialchars($secPhone, ENT_QUOTES, 'UTF-8'); ?> <span class="text-muted">(Sec)</span>
                                                 </a>
                                             <?php else: ?>
-                                                <small class="text-muted">No Phone</small>
+                                                <small class="text-muted"><i class="fas fa-phone-slash me-1"></i>No Phone</small>
                                             <?php endif; ?>
 
                                             <?php if(!empty($sEmail)): ?>
@@ -384,11 +416,12 @@ $result = mysqli_stmt_get_result($stmt);
                                     <?php endif; ?>
                                 </td>
                                 
-                                <td><span class="badge bg-warning text-dark fs-6"><?php echo htmlspecialchars($row['room_number'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                <td><span class="badge bg-warning text-dark fs-6 shadow-sm"><i class="fas fa-door-closed me-1"></i><?php echo htmlspecialchars($row['room_number'], ENT_QUOTES, 'UTF-8'); ?></span></td>
                                 
                                 <td>
                                     <div class="fw-medium"><?php echo date('M d, Y', strtotime($row['check_in_date'])); ?></div>
-                                    <span class="badge bg-info time-badge text-dark">
+                                    <span class="badge bg-info time-badge text-dark shadow-sm">
+                                        <i class="far fa-clock me-1"></i>
                                         <?php 
                                         $in_time = date('h:i A', strtotime($row['check_in_date']));
                                         if($in_time == '12:00 AM' && !empty($row['arrival_time'])) {
@@ -402,19 +435,20 @@ $result = mysqli_stmt_get_result($stmt);
                                 
                                 <td>
                                     <div class="fw-medium"><?php echo date('M d, Y', strtotime($row['check_out_date'])); ?></div>
-                                    <span class="badge bg-success time-badge">
+                                    <span class="badge bg-success time-badge shadow-sm">
+                                        <i class="far fa-clock me-1"></i>
                                         <?php echo date('h:i A', strtotime($row['check_out_date'])); ?>
                                     </span>
                                 </td>
                                 
-                                <td><span class="badge bg-primary fs-6"><?php echo (int)$row['total_days']; ?> day(s)</span></td>
+                                <td><span class="badge bg-primary fs-6 shadow-sm"><?php echo (int)$row['total_days']; ?> day(s)</span></td>
                                 
-                                <td><span class="badge bg-secondary"><?php echo htmlspecialchars($row['department'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                <td><span class="badge bg-secondary shadow-sm"><?php echo htmlspecialchars($row['department'], ENT_QUOTES, 'UTF-8'); ?></span></td>
                                 
                                 <?php if(in_array($userRole, ['admin', 'superadmin'])): ?>
                                     <td class="text-center">
                                         <a href="?delete=1&id=<?php echo $row['id']; ?>&csrf=<?php echo urlencode($_SESSION['csrf_token']); ?>" 
-                                           class="delete-btn btn btn-sm p-1 rounded-circle"
+                                           class="delete-btn btn btn-sm p-2 rounded-circle"
                                            onclick="return confirm('⚠️ Are you sure? This will delete the record permanently.')"
                                            title="Delete Record">
                                             <i class="fas fa-trash-alt"></i>
@@ -432,12 +466,12 @@ $result = mysqli_stmt_get_result($stmt);
         <div class="text-center mt-5 mb-5">
             <div class="row justify-content-center g-3">
                 <div class="col-md-3">
-                    <a href="checkout_list.php" class="btn btn-primary btn-lg w-100 shadow-sm">
+                    <a href="checkout_list.php" class="btn btn-primary btn-lg w-100 shadow-sm fw-bold">
                         <i class="fas fa-clipboard-list me-2"></i>Active Bookings
                     </a>
                 </div>
                 <div class="col-md-3">
-                    <a href="index.php" class="btn btn-outline-secondary btn-lg w-100 shadow-sm">
+                    <a href="index.php" class="btn btn-outline-secondary btn-lg w-100 shadow-sm fw-bold bg-white">
                         <i class="fas fa-home me-2"></i>Dashboard
                     </a>
                 </div>
@@ -446,5 +480,29 @@ $result = mysqli_stmt_get_result($stmt);
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ✅ Toast Initialization Script -->
+    <?php if($toast_msg != ""): ?>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var toastEl = document.getElementById('liveToast');
+            var toastBody = document.getElementById('toastMessage');
+            var closeBtn = document.getElementById('toastCloseBtn');
+            var type = '<?php echo $toast_type; ?>';
+            
+            // Set colors based on success or danger
+            toastEl.className = 'toast align-items-center border-0 shadow-lg bg-' + type + (type === 'warning' ? ' text-dark' : ' text-white');
+            closeBtn.className = 'btn-close me-2 m-auto ' + (type === 'warning' ? '' : 'btn-close-white');
+            
+            // Set Icon
+            var icon = type === 'success' ? 'fa-check-circle' : (type === 'danger' ? 'fa-exclamation-triangle' : 'fa-info-circle');
+            toastBody.innerHTML = '<i class="fas ' + icon + ' me-2"></i> <?php echo addslashes($toast_msg); ?>';
+            
+            var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
+        });
+    </script>
+    <?php endif; ?>
+
 </body>
 </html>
