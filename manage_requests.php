@@ -4,8 +4,8 @@ require_once('db.php');
 require_once('header.php');
 
 // OPTIONAL: Debug er jonno (problem thakle 1 bar on kore error dekhte paro)
- error_reporting(E_ALL);
- ini_set('display_errors', 1);
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // Access Control
 if (!isset($_SESSION['UserName'])) {
@@ -33,8 +33,15 @@ if ($tbl_check && mysqli_num_rows($tbl_check) > 0) {
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     if (in_array($role, ['admin', 'superadmin'])) {
         $id = (int)$_GET['id'];
+        
+        // Delete associated guests first
+        mysqli_query($conn, "DELETE FROM visit_guests WHERE request_id = $id");
+        // Delete master request
         mysqli_query($conn, "DELETE FROM visit_requests WHERE id = $id");
-        header("Location: manage_requests.php?msg=deleted");
+        
+        // Set Session Message for Toast
+        $_SESSION['msg'] = "Request Deleted Successfully!";
+        header("Location: manage_requests.php");
         exit;
     }
 }
@@ -50,21 +57,21 @@ if (isset($_GET['action']) && isset($_GET['id']) && in_array($_GET['action'], ['
     if ($action === 'reject') {
         $reason = isset($_GET['reason']) ? trim($_GET['reason']) : '';
         if ($reason === '') {
-            header("Location: manage_requests.php?error=noreason");
+            $_SESSION['msg'] = "?? Rejection reason is required!";
+            header("Location: manage_requests.php");
             exit;
         }
     }
 
-//Approve/Reject handle querry
-
-$req_sql = mysqli_query(
-    $conn,
-    "SELECT email, guest_name, guest_title,
-            check_in_date, check_in_time,
-            check_out_date, check_out_time,
-            department, purpose, phone, status, requested_by
-     FROM visit_requests WHERE id = $id"
-);
+    // Fetch master request info
+    $req_sql = mysqli_query(
+        $conn,
+        "SELECT email, guest_name, guest_title,
+                check_in_date, check_in_time,
+                check_out_date, check_out_time,
+                department, purpose, phone, status, requested_by
+         FROM visit_requests WHERE id = $id"
+    );
 
     if ($req_sql && mysqli_num_rows($req_sql) > 0) {
         $req_data = mysqli_fetch_assoc($req_sql);
@@ -75,7 +82,6 @@ $req_sql = mysqli_query(
             SET status = '$status', approved_by = '$approver'
             WHERE id = $id
         ";
-//============END=================
 
         if (mysqli_query($conn, $update_sql)) {
 
@@ -88,12 +94,8 @@ $req_sql = mysqli_query(
             }
 
             // Common data for mails
-            $g_name   = $req_data['guest_name'];
-            $g_title  = $req_data['guest_title'] ?? '';
-            $g_phone  = $req_data['phone'] ?? '';
             $dept     = $req_data['department'] ?? '';
             $purpose  = $req_data['purpose'] ?? '';
-            $g_display_name = trim($g_title . ' ' . $g_name);
             
             // Check-in (date + time)
             $check_in_date  = $req_data['check_in_date'] ?? '';
@@ -101,17 +103,13 @@ $req_sql = mysqli_query(
             $check_out_date = $req_data['check_out_date'] ?? '';
             $check_out_time = $req_data['check_out_time'] ?? '';
             
-            $check_in_disp = $check_in_date
-                ? date('d M Y', strtotime($check_in_date))
-                : 'N/A';
-            
+            $check_in_disp = $check_in_date ? date('d M Y', strtotime($check_in_date)) : 'N/A';
             if (!empty($check_in_time) && $check_in_time !== '00:00:00') {
                 $check_in_disp .= ' ' . date('h:i A', strtotime($check_in_time));
             }
             
             // Planned check-out (date + time)
             $checkout_disp = '';
-            
             if (!empty($check_out_date)) {
                 $checkout_disp = date('d M Y', strtotime($check_out_date));
             }
@@ -121,168 +119,212 @@ $req_sql = mysqli_query(
 
             // Mail headers
             $headers  = "MIME-Version: 1.0\r\n";
-            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $headers .= "Content-type:text/html;charset=UTF-8\r\n";
             $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\r\n";
 
-            // ========= SEND EMAIL TO GUEST + REQUESTER =========
-              if (!empty($req_data['email'])) {
-                  $to       = $req_data['email'];         // guest email
-                  $g_email  = $to;
-                  $g_name   = $req_data['guest_name'];
-                  $status_is_approved = ($status === 'Approved');
-              
-                  // ----- requester info (login user who created request) -----
-                  $requester_name  = $req_data['requested_by'];
-                  $requester_email = '';
-              
-                  if (!empty($requester_name)) {
-                      $rq_sql = mysqli_query(
-                          $conn,
-                          "SELECT email 
-                           FROM users 
-                           WHERE UserName = '" . mysqli_real_escape_string($conn, $requester_name) . "' 
-                           LIMIT 1"
-                      );
-                      if ($rq_sql && mysqli_num_rows($rq_sql) > 0) {
-                          $requester_email = mysqli_fetch_assoc($rq_sql)['email'];
-                      }
-                  }
-              
-                  // ---------- Guest mail ----------
-                  if ($status_is_approved) {
-              
-                      $subject_guest = "Your dormitory visit request #$id has been approved";
-              
-                      $msg_guest  = "Dear $g_display_name,\r\n\r\n";
-                      $msg_guest .= "We are happy to inform you that your dormitory visit request (Ref #$id) has been APPROVED.\r\n\r\n";
-                      $msg_guest .= "Visit details:\r\n";
-                      $msg_guest .= "- Check-in : $check_in_disp\r\n";
-                      if ($checkout_disp !== '') {
-                      $msg_guest .= "- Planned Check-out : $checkout_disp\r\n";
-                  }
-                      if ($dept   !== '') $msg_guest .= "- Department: $dept\r\n";
-                      if ($purpose!== '') $msg_guest .= "- Purpose: $purpose\r\n";
-                      $msg_guest .= "\r\n";
-                      $msg_guest .= "Our team is looking forward to welcoming you to the SCL Dormitory.\r\n";
-                      $msg_guest .= "If you need any further assistance, please feel free to contact the dormitory office.\r\n\r\n";
-                      $msg_guest .= "Warm regards,\r\n";
-                      $msg_guest .= "SCL Dormitory Management";
-              
-                  } else {
-              
-                      $subject_guest = "Update on your dormitory visit request #$id";
-              
-                      $msg_guest  = "Dear $g_display_name,\r\n\r\n";
-                      $msg_guest .= "Thank you for your interest in staying at the SCL Dormitory.\r\n";
-                      $msg_guest .= "After careful review, we are unable to approve your visit request (Ref #$id) at this time.\r\n\r\n";
-                      $msg_guest .= "Reason:\r\n";
-                      $msg_guest .= $reason . "\r\n\r\n";
-                      $msg_guest .= "We understand this may be disappointing and we truly appreciate your understanding.\r\n";
-                      $msg_guest .= "You are always welcome to submit a new request in the future if your plans change.\r\n\r\n";
-                      $msg_guest .= "With best regards,\r\n";
-                      $msg_guest .= "SCL Dormitory Management";
-                  }
-              
-                  // Guest ke mail
-                  @mail($g_email, $subject_guest, $msg_guest, $headers);
-              
-                  // ---------- Requester mail (copy) ----------
-                  if (!empty($requester_email)) {
-              
-                      // guest ?? requester ??? ??? ?? (same email ?? same ???) ????? ????? ???? ????? ??
-                      $same_person =
-                          (strcasecmp(trim($requester_email), trim($g_email)) === 0) ||
-                          (strcasecmp(trim($requester_name), trim($g_name)) === 0);
-              
-                      if (!$same_person) {
-              
-                          if ($status_is_approved) {
-                              $subj_req = "Copy: Guest $g_name visit request #$id approved";
-              
-                              $msg_req  = "Dear $requester_name,\r\n\r\n";
-                              $msg_req .= "The dormitory visit request you submitted for $g_name (Ref #$id) has been APPROVED.\r\n\r\n";
-                              $msg_req .= "Guest Details:\r\n";
-                              $msg_req .= "Guest Name       : $g_display_name\r\n";
-                              $msg_req .= "Check-in       : $check_in_disp\r\n";
-                              if ($checkout_disp !== '') {
-                              $msg_req .= "Planned Check-out: $checkout_disp\r\n";
-                          }
-                              if ($dept   !== '') $msg_req .= "Department  : $dept\r\n";
-                              if ($purpose!== '') $msg_req .= "Purpose     : $purpose\r\n";
-                              $msg_req .= "\r\nBest regards,\r\nSCL Dormitory Management Team";
-                          } else {
-                              $subj_req = "Copy: Guest $g_name visit request #$id was not approved";
-              
-                              $msg_req  = "Dear $requester_name,\r\n\r\n";
-                              $msg_req .= "The dormitory visit request you submitted for $g_name (Ref #$id) could not be approved.\r\n\r\n";
-                              $msg_req .= "Reason provided:\r\n";
-                              $msg_req .= $reason . "\r\n\r\n";
-                              $msg_req .= "Best regards,\r\nSCL Dormitory Management Team";
-                          }
-              
-                          @mail($requester_email, $subj_req, $msg_req, $headers);
-                      }
-                  }
-              }
+            // ========================================================
+            // ?? 1. SEND INDIVIDUAL EMAIL TO ALL GUESTS IN THE REQUEST
+            // ========================================================
+            $guests_sql = mysqli_query($conn, "SELECT * FROM visit_guests WHERE request_id = $id");
+            $guest_list_for_staff = ""; // This will build the text list for the staff email
+            $guest_emails_sent = [];
 
+            while($g = mysqli_fetch_assoc($guests_sql)) {
+                $g_name = "{$g['guest_title']} {$g['guest_name']}";
+                $g_email = $g['email'];
+                $g_phone = $g['phone'];
+                $g_address = $g['address'];
+                
+                // Build string for Staff/Admin Email later
+                $guest_list_for_staff .= "<li><strong>$g_name</strong> (Phone: $g_phone, Email: $g_email, Addr: $g_address)</li>";
 
-            // ========= SEND EMAIL TO STAFF / ADMIN (Only on Approval) =========
+                // Send Mail to Guest if email exists
+                if (!empty($g_email) && !in_array($g_email, $guest_emails_sent)) {
+                    $guest_emails_sent[] = $g_email; // Prevent duplicate emails
+                    
+                    if ($status === 'Approved') {
+                        $subject_guest = "Your dormitory visit request #$id has been approved";
+                        $mail_body = "
+                        <html><body style='font-family:Segoe UI,sans-serif;color:#333;'>
+                            <div style='max-width:600px;margin:20px auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
+                                <div style='background:#1a2a3a;color:#fff;padding:20px;text-align:center;'>
+                                    <h2 style='margin:0;'>Visit Request Approved</h2>
+                                    <p style='margin:5px 0 0;'>Reference ID: #$id</p>
+                                </div>
+                                <div style='padding:25px;'>
+                                    <p style='font-size:16px;'><strong>Dear $g_name,</strong></p>
+                                    <p>We are happy to inform you that your dormitory visit request (Ref #$id) has been <strong style='color:#28a745;'>APPROVED</strong>.</p>
+                                    
+                                    <p style='margin-top:20px; margin-bottom:5px;'><strong>Visit details:</strong></p>
+                                    <ul style='margin-top:0; padding-left:20px;'>
+                                        <li><strong>Check-in:</strong> $check_in_disp</li>";
+                                        if ($checkout_disp !== '') $mail_body .= "<li><strong>Planned Check-out:</strong> $checkout_disp</li>";
+                                        if ($dept !== '') $mail_body .= "<li><strong>Department:</strong> $dept</li>";
+                                        if ($purpose !== '') $mail_body .= "<li><strong>Purpose:</strong> $purpose</li>";
+                        $mail_body .= "</ul>
+                                    <p style='margin-top:20px;'>Our team is looking forward to welcoming you to the SCL Dormitory.</p>
+                                    <br>
+                                    <p style='margin:0;'>Best regards,<br>SCL Dormitory Management Team</p>
+                                </div>
+                                <div style='background:#f1f1f1;padding:15px;text-align:center;font-size:12px;color:#666;'>
+                                    <p style='margin:0;'>SCL Dormitory Management System</p>
+                                </div>
+                            </div>
+                        </body></html>";
+                    } else {
+                        $subject_guest = "Update on your dormitory visit request #$id";
+                        $mail_body = "
+                        <html><body style='font-family:Segoe UI,sans-serif;color:#333;'>
+                            <div style='max-width:600px;margin:20px auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
+                                <div style='background:#dc3545;color:#fff;padding:20px;text-align:center;'>
+                                    <h2 style='margin:0;'>Visit Request Update</h2>
+                                    <p style='margin:5px 0 0;'>Reference ID: #$id</p>
+                                </div>
+                                <div style='padding:25px;'>
+                                    <p style='font-size:16px;'><strong>Dear $g_name,</strong></p>
+                                    <p>Thank you for your interest in staying at the SCL Dormitory.</p>
+                                    <p>After careful review, we are unable to approve your visit request (Ref #$id) at this time.</p>
+                                    
+                                    <div style='background:#fff3f3;border-left:4px solid #dc3545;padding:15px;margin:20px 0;'>
+                                        <p style='margin:0;'><strong>Reason for rejection:</strong><br>$reason</p>
+                                    </div>
+                                    
+                                    <p>We understand this may be disappointing and we truly appreciate your understanding.</p>
+                                    <p>You are always welcome to submit a new request in the future if your plans change.</p>
+                                    <br>
+                                    <p style='margin:0;'>Best regards,<br>SCL Dormitory Management Team</p>
+                                </div>
+                                <div style='background:#f1f1f1;padding:15px;text-align:center;font-size:12px;color:#666;'>
+                                    <p style='margin:0;'>SCL Dormitory Management System</p>
+                                </div>
+                            </div>
+                        </body></html>";
+                    }
+                    
+                    @mail($g_email, $subject_guest, $mail_body, $headers);
+                }
+            }
+
+            // ========================================================
+            // ?? 2. SEND EMAIL TO REQUESTER (If different from guests)
+            // ========================================================
+            $requester_name = $req_data['requested_by'];
+            if (!empty($requester_name)) {
+                $rq_sql = mysqli_query($conn, "SELECT email FROM users WHERE UserName = '" . mysqli_real_escape_string($conn, $requester_name) . "' LIMIT 1");
+                if ($rq_sql && mysqli_num_rows($rq_sql) > 0) {
+                    $requester_email = mysqli_fetch_assoc($rq_sql)['email'];
+                    
+                    if (!empty($requester_email) && !in_array($requester_email, $guest_emails_sent)) {
+                        if ($status === 'Approved') {
+                            $subj_req = "Copy: Visit request #$id has been approved";
+                            $mail_body_req = "
+                            <html><body style='font-family:Segoe UI,sans-serif;color:#333;'>
+                                <div style='max-width:600px;margin:20px auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
+                                    <div style='background:#1a2a3a;color:#fff;padding:20px;text-align:center;'>
+                                        <h2 style='margin:0;'>Visit Request Approved</h2>
+                                        <p style='margin:5px 0 0;'>Reference ID: #$id</p>
+                                    </div>
+                                    <div style='padding:25px;'>
+                                        <p style='font-size:16px;'><strong>Dear $requester_name,</strong></p>
+                                        <p>The dormitory visit request you submitted (Ref #$id) has been <strong style='color:#28a745;'>APPROVED</strong>.</p>
+                                        
+                                        <p style='margin-top:20px; margin-bottom:5px;'><strong>Visit details:</strong></p>
+                                        <ul style='margin-top:0; padding-left:20px;'>
+                                            <li><strong>Check-in:</strong> $check_in_disp</li>";
+                                            if ($checkout_disp !== '') $mail_body_req .= "<li><strong>Planned Check-out:</strong> $checkout_disp</li>";
+                                            if ($dept !== '') $mail_body_req .= "<li><strong>Department:</strong> $dept</li>";
+                                            if ($purpose !== '') $mail_body_req .= "<li><strong>Purpose:</strong> $purpose</li>";
+                            $mail_body_req .= "</ul>
+                                        
+                                        <h4 style='border-bottom:1px solid #eee;padding-bottom:5px;'>Visitor(s):</h4>
+                                        <ul style='padding-left:20px;'>
+                                            $guest_list_for_staff
+                                        </ul>
+                                        
+                                        <br>
+                                        <p style='margin:0;'>Best regards,<br>SCL Dormitory Management Team</p>
+                                    </div>
+                                    <div style='background:#f1f1f1;padding:15px;text-align:center;font-size:12px;color:#666;'>
+                                        <p style='margin:0;'>SCL Dormitory Management System</p>
+                                    </div>
+                                </div>
+                            </body></html>";
+                        } else {
+                            $subj_req = "Copy: Visit request #$id was not approved";
+                            $mail_body_req = "
+                            <html><body style='font-family:Segoe UI,sans-serif;color:#333;'>
+                                <div style='max-width:600px;margin:20px auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
+                                    <div style='background:#dc3545;color:#fff;padding:20px;text-align:center;'>
+                                        <h2 style='margin:0;'>Visit Request Update</h2>
+                                        <p style='margin:5px 0 0;'>Reference ID: #$id</p>
+                                    </div>
+                                    <div style='padding:25px;'>
+                                        <p style='font-size:16px;'><strong>Dear $requester_name,</strong></p>
+                                        <p>The dormitory visit request you submitted (Ref #$id) could not be approved.</p>
+                                        
+                                        <div style='background:#fff3f3;border-left:4px solid #dc3545;padding:15px;margin:20px 0;'>
+                                            <p style='margin:0;'><strong>Reason provided:</strong><br>$reason</p>
+                                        </div>
+                                        <br>
+                                        <p style='margin:0;'>Best regards,<br>SCL Dormitory Management Team</p>
+                                    </div>
+                                    <div style='background:#f1f1f1;padding:15px;text-align:center;font-size:12px;color:#666;'>
+                                        <p style='margin:0;'>SCL Dormitory Management System</p>
+                                    </div>
+                                </div>
+                            </body></html>";
+                        }
+                        
+                        @mail($requester_email, $subj_req, $mail_body_req, $headers);
+                    }
+                }
+            }
+
+            // ========================================================
+            // ?? 3. SEND EMAIL TO STAFF / ADMIN (Only on Approval)
+            // ========================================================
             if ($status === 'Approved') {
-                // dhore ?????? users ?????? role ??????? ??? user_role
-                $staff_admin_sql = "
-                    SELECT email 
-                    FROM users 
-                    WHERE user_role IN ('admin', 'superadmin', 'staff') 
-                      AND email IS NOT NULL 
-                      AND email != ''
-                ";
+                $staff_admin_sql = "SELECT email FROM users WHERE user_role IN ('admin', 'superadmin', 'staff') AND email IS NOT NULL AND email != ''";
                 $staff_result = mysqli_query($conn, $staff_admin_sql);
 
                 if ($staff_result && mysqli_num_rows($staff_result) > 0) {
                     $staff_subject = "APPROVED: Visit Request #$id ready for booking";
 
-                    $staff_msg  = "SCL DORMITORY MANAGEMENT SYSTEM\r\n";
-                    $staff_msg .= "Internal Notification\r\n";
-                    $staff_msg .= "==================================================\r\n\r\n";
+                    $staff_msg = "
+                    <html><body style='font-family:Segoe UI,sans-serif;color:#333;'>
+                        <div style='max-width:600px;margin:20px auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
+                            <div style='background:#1a2a3a;color:#fff;padding:20px;text-align:center;'>
+                                <h2 style='margin:0;'>Action Required: Room Allocation</h2>
+                                <p style='margin:5px 0 0;'>Reference ID: #$id</p>
+                            </div>
+                            <div style='padding:25px;'>
+                                <p>Dear Authorization Team,</p>
+                                <p>A visit request has been <strong style='color:#28a745;'>APPROVED</strong> and is now pending room allocation.</p>
+                                
+                                <div style='background:#f8f9fa;border-left:4px solid #1a2a3a;padding:15px;margin:20px 0;'>
+                                    <p style='margin:0 0 5px 0;'><strong>Check-in:</strong> $check_in_disp</p>";
+                                    if ($checkout_disp !== '') $staff_msg .= "<p style='margin:0 0 5px 0;'><strong>Planned Out:</strong> $checkout_disp</p>";
+                    $staff_msg .= " <p style='margin:0;'><strong>Approved By:</strong> $approver</p>
+                                </div>
 
-                    $staff_msg .= "Dear Authorization Team,\r\n\r\n";
-                    $staff_msg .= "A visit request has been APPROVED and is now pending room allocation.\r\n\r\n";
+                                <h4 style='border-bottom:1px solid #eee;padding-bottom:5px;'>Visitor Information:</h4>
+                                <ul style='padding-left:20px;'>
+                                    $guest_list_for_staff
+                                </ul>
 
-                    $staff_msg .= "VISITOR INFORMATION\r\n";
-                    $staff_msg .= "--------------------------------------------------\r\n";
-                    $staff_msg .= "Ref. ID        : #$id\r\n";
-                    $staff_msg .= "Guest Name     : $g_display_name\r\n";
-                    if ($g_phone !== '') {
-                        $staff_msg .= "Contact        : $g_phone\r\n";
-                    }
-                    if ($dept !== '') {
-                        $staff_msg .= "Department     : $dept\r\n";
-                    }
-                    if ($purpose !== '') {
-                        $staff_msg .= "Visit Purpose  : $purpose\r\n";
-                    }
-                    $staff_msg .= "--------------------------------------------------\r\n\r\n";
-
-                    $staff_msg .= "APPROVAL DETAILS\r\n";
-                    $staff_msg .= "--------------------------------------------------\r\n";
-                    $staff_msg .= "Check-in       : $check_in_disp\r\n";
-                    if ($checkout_disp !== '') {
-                    $staff_msg .= "Planned Out    : $checkout_disp\r\n";
-                }
-                    $staff_msg .= "Approved By    : $approver\r\n";
-                    $staff_msg .= "Status         : APPROVED (Pending Booking)\r\n";
-                    $staff_msg .= "--------------------------------------------------\r\n\r\n";
-
-                    $staff_msg .= "ACTION REQUIRED:\r\n";
-                    $staff_msg .= "Please log in to the system to assign a room for this guest.\r\n\r\n";
-
-                    $staff_msg .= "Access Dashboard:\r\n";
-                    $staff_msg .= "http://" . $_SERVER['HTTP_HOST'] . "/dormitory/index.php\r\n\r\n";
-
-                    $staff_msg .= "==================================================\r\n";
-                    $staff_msg .= "Note: This is an automated system notification.\r\n";
-                    $staff_msg .= "SCL Dormitory Management Team\r\n";
-                    $staff_msg .= "==================================================";
+                                <p style='margin-top:25px;'>Please log in to the system to assign a room for the guests.</p>
+                                <div style='text-align:center; margin:30px 0;'>
+                                    <a href='http://" . $_SERVER['HTTP_HOST'] . "/dormitory/index.php' style='display:inline-block;background:#0d6efd;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;'>Access Dashboard</a>
+                                </div>
+                                
+                                <br>
+                                <p style='margin:0;font-size:14px;'>SCL Dormitory Management Team</p>
+                            </div>
+                            <div style='background:#f1f1f1;padding:15px;text-align:center;font-size:12px;color:#666;'>
+                                <p style='margin:0;'>SCL Dormitory Management System</p>
+                            </div>
+                        </div>
+                    </body></html>";
 
                     while ($staff = mysqli_fetch_assoc($staff_result)) {
                         @mail($staff['email'], $staff_subject, $staff_msg, $headers);
@@ -290,6 +332,7 @@ $req_sql = mysqli_query(
                 }
             }
         }
+        $_SESSION['msg'] = ($status === 'Approved') ? "Request Approved Successfully!" : "Request Rejected Successfully!";
     }
 
     header("Location: manage_requests.php");
@@ -300,30 +343,94 @@ $req_sql = mysqli_query(
 $pending_query = mysqli_query($conn, "SELECT COUNT(*) as cnt FROM visit_requests WHERE status='Pending'");
 $pending_count = mysqli_fetch_assoc($pending_query)['cnt'];
 
-$sql    = "SELECT * FROM visit_requests ORDER BY id DESC";
+// ?? Fetch all requests EXCEPT 'Draft'
+$sql    = "SELECT * FROM visit_requests WHERE status != 'Draft' ORDER BY id DESC";
 $result = mysqli_query($conn, $sql);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile viewport meta -->
     <title>Manage Requests</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
-        .sidebar { background: #1a2a3a; color: white; height: 100vh; position: fixed; width: 250px; padding: 20px; overflow-y: auto; z-index: 1000; }
-        .content { margin-left: 250px; padding: 30px; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+        
+        /* ?? Fade-in Animation */
+        .page-fade-in { animation: fadeIn 0.6s ease-in-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ?? Floating Toast Notifications */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .custom-toast { min-width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: none; border-radius: 8px; overflow: hidden; }
+
+        /* Sidebar Styling */
+        .sidebar { background: #1a2a3a; color: white; height: 100vh; position: fixed; width: 250px; padding: 20px; overflow-y: auto; z-index: 1000; transition: transform 0.3s ease; }
+        .content { margin-left: 250px; padding: 30px; transition: margin-left 0.3s ease; }
+        
+        /* Mobile Top Navbar */
+        .mobile-navbar { display: none; background: #1a2a3a; color: white; padding: 15px 20px; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 999; }
+        .menu-toggle-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+
+        .guest-item { border-left: 3px solid #28a745; padding-left: 10px; margin-bottom: 10px; }
+
+        /* RESPONSIVE STYLES */
         @media (max-width: 768px) {
-            .sidebar { width: 100%; height: auto; position: relative; }
-            .content { margin-left: 0; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.active { transform: translateX(0); }
+            .content { margin-left: 0; padding: 15px; }
+            .mobile-navbar { display: flex; }
+            .content { padding-top: 20px; }
+            .card-body { padding: 10px; }
+            .table-responsive { border: 0; }
         }
+        
+        /* Overlay for mobile sidebar */
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+        .sidebar-overlay.active { display: block; }
     </style>
 </head>
-<body>
+<body class="page-fade-in">
 
-<div class="sidebar">
-    <h4 class="mb-4 text-center"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
+<!-- ?? Floating Toast Notifications -->
+<div class="toast-container">
+    <?php if (isset($_SESSION['msg']) && !empty($_SESSION['msg'])): ?>
+        <?php 
+            $msg_text = $_SESSION['msg'];
+            $is_warning = strpos($msg_text, '??') !== false;
+            $bg_class = $is_warning ? 'bg-warning text-dark' : 'bg-success text-white';
+            $icon = $is_warning ? 'fa-exclamation-triangle' : 'fa-check-circle';
+            $title = $is_warning ? 'Warning' : 'Success';
+        ?>
+        <div class="toast custom-toast show" role="alert" data-bs-delay="4000">
+            <div class="toast-header <?php echo $bg_class; ?> border-0">
+                <i class="fas <?php echo $icon; ?> me-2"></i><strong class="me-auto"><?php echo $title; ?></strong>
+                <button type="button" class="btn-close <?php echo $is_warning ? '' : 'btn-close-white'; ?>" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body bg-white text-dark fw-semibold">
+                <?php echo str_replace('??', '', $msg_text); ?>
+            </div>
+        </div>
+        <?php unset($_SESSION['msg']); ?>
+    <?php endif; ?>
+</div>
+
+<!-- Mobile Navbar & Overlay -->
+<div class="mobile-navbar shadow-sm">
+    <h5 class="mb-0"><i class="fas fa-hotel me-2"></i>SCL DMS</h5>
+    <button class="menu-toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+</div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="d-flex justify-content-between align-items-center mb-4 d-md-none">
+        <h4 class="mb-0"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
+        <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+    </div>
+    <h4 class="mb-4 text-center d-none d-md-block"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
     <div class="p-3 mb-4 bg-white bg-opacity-10 rounded text-center">
         <small>Welcome,</small><br><strong><?php echo htmlspecialchars($user); ?></strong><br>
         <span class="badge bg-warning text-dark mt-1"><?php echo strtoupper($role); ?></span>
@@ -358,27 +465,13 @@ $result = mysqli_query($conn, $sql);
 <div class="content">
     <div class="card shadow border-0">
         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-list-ul me-2"></i>Manage Visit Requests</h5>
+            <h5 class="mb-0" style="font-size: 1.1rem;"><i class="fas fa-list-ul me-2"></i>Manage Visit Requests</h5>
             <span class="badge bg-light text-dark"><?php echo $pending_count; ?> Pending</span>
         </div>
 
         <div class="card-body">
-            <?php if(isset($_GET['error']) && $_GET['error'] == 'noreason'): ?>
-                <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                    Rejection reason is required. The request was not rejected.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <?php endif; ?>
-
-            <?php if(isset($_GET['msg']) && $_GET['msg'] == 'deleted'): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    Request Deleted Successfully!
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <?php endif; ?>
-
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle" style="min-width: 900px;"> <!-- Minimum width to avoid squishing on mobile -->
                     <thead class="table-dark">
                         <tr>
                             <th>Ref ID</th>
@@ -394,78 +487,61 @@ $result = mysqli_query($conn, $sql);
                     <tbody>
                         <?php while($row = mysqli_fetch_assoc($result)): ?>
                         <?php
-                            // Title + Name
-                            $guest_title = htmlspecialchars($row['guest_title'] ?? '', ENT_QUOTES, 'UTF-8');
-                            $guest_name  = htmlspecialchars($row['guest_name'] ?? '', ENT_QUOTES, 'UTF-8');
-                            $display_name = trim($guest_title . ' ' . $guest_name);
-                        
-                            $cinDate  = !empty($row['check_in_date'])
-                                ? date('d M Y', strtotime($row['check_in_date']))
-                                : '-';
-                        
-                            $cinTime  = (!empty($row['check_in_time']) && $row['check_in_time'] != '00:00:00')
-                                ? date('h:i A', strtotime($row['check_in_time']))
-                                : '';
-                        
-                            $coutDate = !empty($row['check_out_date'])
-                                ? date('d M Y', strtotime($row['check_out_date']))
-                                : '-';
-                        
-                            $coutTime = (!empty($row['check_out_time']) && $row['check_out_time'] != '00:00:00')
-                                ? date('h:i A', strtotime($row['check_out_time']))
-                                : '';
+                            $cinDate  = !empty($row['check_in_date']) ? date('d M Y', strtotime($row['check_in_date'])) : '-';
+                            $cinTime  = (!empty($row['check_in_time']) && $row['check_in_time'] != '00:00:00') ? date('h:i A', strtotime($row['check_in_time'])) : '';
+                            $coutDate = !empty($row['check_out_date']) ? date('d M Y', strtotime($row['check_out_date'])) : '-';
+                            $coutTime = (!empty($row['check_out_time']) && $row['check_out_time'] != '00:00:00') ? date('h:i A', strtotime($row['check_out_time'])) : '';
                         ?>
                         <tr>
                             <td>#<?php echo $row['id']; ?></td>
                             <td>
-                                <strong><?php echo $display_name; ?></strong><br>
-                                <small><i class="fas fa-phone me-1"></i><?php echo htmlspecialchars($row['phone']); ?></small><br>
-                                <small class="text-muted"><?php echo htmlspecialchars($row['designation']); ?></small>
+                                <!-- ?? MULTIPLE GUESTS DISPLAY WITH ADDRESS -->
+                                <?php 
+                                    $g_sql = mysqli_query($conn, "SELECT * FROM visit_guests WHERE request_id = ".$row['id']);
+                                    if(mysqli_num_rows($g_sql) > 0):
+                                        while($g = mysqli_fetch_assoc($g_sql)):
+                                ?>
+                                        <div class="guest-item">
+                                            <strong><?php echo htmlspecialchars($g['guest_title'].' '.$g['guest_name']); ?></strong><br>
+                                            <small class="text-muted" style="font-size: 0.8rem;">
+                                                <i class="fas fa-phone"></i> <?php echo htmlspecialchars($g['phone']); ?> | 
+                                                <i class="fas fa-envelope"></i> <?php echo !empty($g['email']) ? htmlspecialchars($g['email']) : 'N/A'; ?><br>
+                                                <i class="fas fa-map-marker-alt"></i> <?php echo !empty($g['address']) ? htmlspecialchars($g['address']) : 'N/A'; ?>
+                                            </small>
+                                        </div>
+                                <?php 
+                                        endwhile;
+                                    else: 
+                                ?>
+                                    <strong><?php echo htmlspecialchars($row['guest_name']); ?></strong><br>
+                                    <small class="text-muted"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($row['phone']); ?></small>
+                                <?php endif; ?>
                             </td>
                             <td>
-                                <span class="badge bg-secondary"><?php echo $row['department']; ?></span><br>
-                                <small><?php echo htmlspecialchars($row['purpose']); ?></small>
+                                <span class="badge bg-secondary"><?php echo htmlspecialchars($row['department']); ?></span><br>
+                                <small style="font-size: 0.85rem;"><?php echo htmlspecialchars($row['purpose']); ?></small>
                             </td>
-                            <td>
+                            <td style="font-size: 0.9rem;">
                                 <div>
-                                    <strong>In:</strong>
-                                    <?php echo $cinDate; ?>
-                                    <?php if ($cinTime !== ''): ?>
-                                        <span class="badge bg-info text-dark ms-1">
-                                            <?php echo $cinTime; ?>
-                                        </span>
-                                    <?php endif; ?>
+                                    <strong>In:</strong> <?php echo $cinDate; ?>
+                                    <?php if ($cinTime !== ''): ?> <span class="badge bg-info text-dark ms-1"><?php echo $cinTime; ?></span> <?php endif; ?>
                                 </div>
-                            
                                 <div class="mt-1">
-                                    <strong>Out:</strong>
-                                    <?php echo $coutDate; ?>
-                                    <?php if ($coutTime !== ''): ?>
-                                        <span class="badge bg-secondary text-light ms-1">
-                                            <?php echo $coutTime; ?>
-                                        </span>
-                                    <?php endif; ?>
+                                    <strong>Out:</strong> <?php echo $coutDate; ?>
+                                    <?php if ($coutTime !== ''): ?> <span class="badge bg-secondary text-light ms-1"><?php echo $coutTime; ?></span> <?php endif; ?>
                                 </div>
                             </td>
 
                             <td>
                                 <?php 
                                     $s = $row['status'];
-                                    if(in_array($s, ['Booked', 'Completed'])) {
-                                        $s = 'Approved';
-                                    }
-                                    $cls = ($s == 'Pending') ? 'warning' : (($s == 'Approved') ? 'success' : 'danger');
+                                    if(in_array($s, ['Booked', 'Completed'])) { $s = 'Approved'; }
+                                    $cls = ($s == 'Pending') ? 'warning text-dark' : (($s == 'Approved') ? 'success' : 'danger');
                                     echo "<span class='badge bg-$cls'>$s</span>";
                                 ?>
                             </td>
-                            <td>
-                                <?php 
-                                    if (!empty($row['approved_by'])) {
-                                        echo htmlspecialchars($row['approved_by']);
-                                    } else {
-                                        echo '<span class="text-muted">-</span>';
-                                    }
-                                ?>
+                            <td style="font-size: 0.85rem;">
+                                <?php echo !empty($row['approved_by']) ? htmlspecialchars($row['approved_by']) : '<span class="text-muted">-</span>'; ?>
                             </td>
                             <td><small class="text-muted"><?php echo htmlspecialchars($row['requested_by']); ?></small></td>
                             <td>
@@ -482,18 +558,15 @@ $result = mysqli_query($conn, $sql);
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#rejectModal"
                                                 data-id="<?php echo $row['id']; ?>"
-                                                data-guest="<?php echo htmlspecialchars($display_name); ?>">
+                                                data-guest="<?php echo htmlspecialchars($row['guest_name']); ?>">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     <?php else: ?>
                                         <span class="text-muted small me-2">
                                             <?php 
                                                 $final_status = $row['status'];
-                                                if(in_array($final_status, ['Booked', 'Completed'])) {
-                                                    echo "Approved";
-                                                } else {
-                                                    echo $final_status;
-                                                }
+                                                if(in_array($final_status, ['Booked', 'Completed'])) { echo "Approved"; } 
+                                                else { echo $final_status; }
                                             ?>
                                         </span>
                                     <?php endif; ?>
@@ -529,13 +602,13 @@ $result = mysqli_query($conn, $sql);
       </div>
       <form id="rejectForm">
         <div class="modal-body">
-          <p class="mb-2">
+          <p class="mb-2 text-dark">
             You are about to reject the request for:<br>
             <strong id="rejectGuestName"></strong>
           </p>
           <input type="hidden" id="rejectRequestId">
           <div class="mb-3">
-            <label for="rejectReason" class="form-label fw-semibold">
+            <label for="rejectReason" class="form-label fw-semibold text-dark">
                 Please write the reason for rejection
             </label>
             <textarea class="form-control" id="rejectReason" rows="3" 
@@ -559,6 +632,20 @@ $result = mysqli_query($conn, $sql);
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// Sidebar Toggle Logic for Mobile
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    // ?? Initialize Toasts automatically
+    var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+    var toastList = toastElList.map(function (toastEl) {
+        return new bootstrap.Toast(toastEl, { autohide: true });
+    });
+});
+
 var rejectModal = document.getElementById('rejectModal');
 rejectModal.addEventListener('show.bs.modal', function (event) {
     var button = event.relatedTarget;

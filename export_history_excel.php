@@ -1,8 +1,6 @@
 <?php
 session_start();
 require_once('db.php');
-// header.php ????? ????? ??? ???? ???? Excel ???? ??????? ????, HTML ??? ???????? ???
-// require_once('header.php'); 
 
 // ? 1. SET DATABASE CHARSET TO UTF-8
 mysqli_set_charset($conn, "utf8mb4");
@@ -11,10 +9,12 @@ if (!isset($_SESSION['UserName']) || !in_array($_SESSION['UserRole'], ['admin', 
     die("Access Denied!");
 }
 
-// ? GET FILTERS
+// ? GET ALL FILTERS (MATCHING checkout_history.php)
 $from_date = isset($_GET['from_date']) ? mysqli_real_escape_string($conn, trim($_GET['from_date'])) : '';
 $to_date = isset($_GET['to_date']) ? mysqli_real_escape_string($conn, trim($_GET['to_date'])) : '';
 $room_filter = isset($_GET['room']) ? mysqli_real_escape_string($conn, trim($_GET['room'])) : '';
+$guest_filter = isset($_GET['guest_name']) ? mysqli_real_escape_string($conn, trim($_GET['guest_name'])) : '';
+$ref_filter = isset($_GET['ref_no']) ? mysqli_real_escape_string($conn, trim($_GET['ref_no'])) : '';
 
 // ? BUILD QUERY CONDITIONS
 $where_conditions = [];
@@ -28,9 +28,19 @@ if (!empty($from_date) && !empty($to_date)) {
     $where_conditions[] = "DATE(cog.check_out_date) <= '$to_date'";
 }
 
-// Room Filter (Updated Part)
+// Room Filter
 if (!empty($room_filter)) {
     $where_conditions[] = "cog.room_number = '$room_filter'";
+}
+
+// Guest Filter
+if (!empty($guest_filter)) {
+    $where_conditions[] = "(cog.guest_name LIKE '%$guest_filter%' OR b.secondary_guest_name LIKE '%$guest_filter%')";
+}
+
+// Ref Filter
+if (!empty($ref_filter)) {
+    $where_conditions[] = "b.request_ref_id = '$ref_filter'";
 }
 
 // Combine Conditions
@@ -41,7 +51,7 @@ if (count($where_conditions) > 0) {
 
 // ? FETCH DATA QUERY
 $sql = "SELECT cog.*, 
-               b.guest_email, b.notes, b.purpose, b.arrival_time, b.secondary_guest_email,
+               b.guest_email, b.notes, b.purpose, b.arrival_time, b.secondary_guest_email, b.request_ref_id,
                r.room_type, r.floor
         FROM checked_out_guests cog 
         LEFT JOIN bookings b ON cog.booking_id = b.id 
@@ -69,22 +79,21 @@ echo "<table border='0' width='100%' cellpadding='10' cellspacing='0'>";
 
 // Company Header
 echo "<tr>";
-// Increased colspan to 25 to match data columns
-echo "<td colspan='25' style='text-align:center; background-color:#224895; color:white; padding:20px;'>";
+echo "<td colspan='26' style='text-align:center; background-color:#224895; color:white; padding:20px;'>";
 echo "<div style='font-size:18px; font-weight:bold; margin-bottom:5px;'>SHELTECH CERAMICS LIMITED</div>"; 
 echo "</td>";
 echo "</tr>";
 
 // REPORT TITLE
 echo "<tr>";
-echo "<td colspan='25' style='text-align:center; font-size:20px; font-weight:bold; padding:15px; background-color:#1a3666; color:white;'>";
+echo "<td colspan='26' style='text-align:center; font-size:20px; font-weight:bold; padding:15px; background-color:#1a3666; color:white;'>";
 echo "DORMITORY HISTORY REPORT";
 echo "</td>";
 echo "</tr>";
 
 // FILTER INFO DISPLAY
 echo "<tr>";
-echo "<td colspan='25' style='text-align:center; font-size:14px; font-weight:bold; padding:8px; background-color:#f0f0f0;'>";
+echo "<td colspan='26' style='text-align:center; font-size:14px; font-weight:bold; padding:8px; background-color:#f0f0f0;'>";
 
 $filter_msg = [];
 
@@ -98,6 +107,12 @@ if (!empty($from_date) && !empty($to_date)) {
 
 if (!empty($room_filter)) {
     $filter_msg[] = "Room: " . htmlspecialchars($room_filter);
+}
+if (!empty($guest_filter)) {
+    $filter_msg[] = "Guest: " . htmlspecialchars($guest_filter);
+}
+if (!empty($ref_filter)) {
+    $filter_msg[] = "Ref No: " . htmlspecialchars($ref_filter);
 }
 
 if (empty($filter_msg)) {
@@ -115,6 +130,7 @@ echo "<table border='1' cellpadding='5' cellspacing='0' width='100%'>";
 echo "<thead>";
 echo "<tr style='background-color: #224895; color: white; font-weight: bold;'>";
 echo "<th>SL</th>";
+echo "<th>Ref No</th>";
 echo "<th>Guest Name</th>";
 echo "<th>Designation</th>";
 echo "<th>Address</th>";
@@ -192,6 +208,7 @@ if (mysqli_num_rows($result) > 0) {
         
         echo "<tr>";
         echo "<td style='text-align:center;'>" . $sl++ . "</td>";
+        echo "<td style='text-align:center;'>" . htmlspecialchars($row['request_ref_id'] ?? '—') . "</td>";
         echo "<td style='font-weight:bold;'>" . htmlspecialchars($row['guest_name']) . "</td>";
         echo "<td>" . $desig . "</td>";
         echo "<td>" . $addr . "</td>";
@@ -221,7 +238,7 @@ if (mysqli_num_rows($result) > 0) {
         echo "</tr>";
     }
 } else {
-    echo "<tr><td colspan='25' style='text-align:center; font-weight:bold; color:red; padding:20px;'>No Records Found for the selected criteria.</td></tr>";
+    echo "<tr><td colspan='26' style='text-align:center; font-weight:bold; color:red; padding:20px;'>No Records Found for the selected criteria.</td></tr>";
 }
 
 echo "</tbody>";

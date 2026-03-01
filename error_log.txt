@@ -1,0 +1,56 @@
+[17-Feb-2026 18:06:34 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:10 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:18 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:19 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:23 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:30 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:30 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:09:31 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:12:32 Asia/Dhaka] Checkout Error: Column count doesn't match value count at row 1
+[17-Feb-2026 18:43:43 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 18:45:38 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 18:45:38 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 18:45:39 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 20:21:30 Asia/Dhaka] PHP Fatal error:  Uncaught ArgumentCountError: The number of elements in the type definition string must match the number of bind variables in /var/www/html/dormitory/checkout_list.php:266
+Stack trace:
+#0 /var/www/html/dormitory/checkout_list.php(266): mysqli_stmt_bind_param()
+#1 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 266
+[17-Feb-2026 20:24:13 Asia/Dhaka] Checkout Error: Incorrect datetime value: '' for column 'check_in_date' at row 1
+[17-Feb-2026 20:24:20 Asia/Dhaka] Checkout Error: Incorrect datetime value: '' for column 'check_in_date' at row 1
+[17-Feb-2026 20:24:30 Asia/Dhaka] Checkout Error: Incorrect datetime value: '' for column 'check_in_date' at row 1
+[17-Feb-2026 20:34:22 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 20:34:42 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 20:34:43 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 20:34:43 Asia/Dhaka] PHP Fatal error:  Uncaught Error: mysqli_stmt_bind_param(): Argument #16 could not be passed by reference in /var/www/html/dormitory/checkout_list.php:263
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/dormitory/checkout_list.php on line 263
+[17-Feb-2026 20:40:09 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[17-Feb-2026 20:44:57 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[17-Feb-2026 20:45:02 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[17-Feb-2026 20:45:40 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[17-Feb-2026 20:45:53 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[17-Feb-2026 20:46:00 Asia/Dhaka] Cancel Booking Error: Unknown column 'secondary_guest_title' in 'field list'
+[28-Feb-2026 09:48:59 Asia/Dhaka] Cancel Error: Data truncated for column 'status' at row 1
