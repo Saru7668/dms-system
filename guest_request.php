@@ -26,6 +26,7 @@ if (empty($_SESSION['form_token'])) {
 // Ì†ΩÌ±§ USER PROFILE DATA LOAD (Default values)
 // ========================================
 $user_data = [
+<<<<<<< HEAD
     'full_name' => $user, 
     'phone' => '', 
     'email' => '', 
@@ -33,6 +34,15 @@ $user_data = [
     'address' => '', 
     'department' => 'Other', 
     'id_proof' => ''
+=======
+    'full_name'   => $user, 
+    'phone'       => '',
+    'email'       => '',
+    'designation' => '',
+    'address'     => '',
+    'department'  => 'Other',
+    'id_proof'    => ''
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 ];
 
 $profile_sql = "SELECT * FROM users WHERE username = '".mysqli_real_escape_string($conn, $user)."' LIMIT 1";
@@ -40,18 +50,41 @@ $profile_res = mysqli_query($conn, $profile_sql);
 
 if ($profile_res && mysqli_num_rows($profile_res) > 0) {
     $fetched_data = mysqli_fetch_assoc($profile_res);
+<<<<<<< HEAD
     $user_data = array_merge($user_data, array_map(function($val) { return $val ?? ''; }, $fetched_data));
+=======
+    if (is_array($fetched_data)) {
+        foreach ($fetched_data as $key => $value) {
+            $user_data[$key] = $value ?? '';
+        }
+    }
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 }
 
 // Department Logic
 $dept_purposes = [
+<<<<<<< HEAD
     "ICT" => ["Software Installation", "Hardware Maintenance", "Network Issue", "Other"],
     "HR & Admin" => ["Interview", "Policy Meeting", "Training", "Other"],
     "Default" => ["Official Visit", "Meeting", "Inspection", "Other"]
+=======
+    "ICT"       => ["Software Installation", "Hardware Maintenance", "Network Issue", "Other"],
+    "HR & Admin"=> ["Interview", "Policy Meeting", "Training", "Other"],
+    "Default"   => ["Official Visit", "Meeting", "Inspection", "Other"]
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 ];
 $current_dept = $user_data['department'] ?? 'Other';
 $purpose_list = isset($dept_purposes[$current_dept]) ? $dept_purposes[$current_dept] : $dept_purposes['Default'];
 
+<<<<<<< HEAD
+=======
+// Always use the user's actual department from the database
+$current_dept = $user_data['department'];
+if (empty($current_dept)) { $current_dept = 'Other'; }
+
+$purpose_list = isset($dept_purposes[$current_dept]) ? $dept_purposes[$current_dept] : $dept_purposes['Default'];
+
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 // Variable to hold redirect instruction
 $redirect_to = "";
 
@@ -67,7 +100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
         exit;
     }
 
+<<<<<<< HEAD
     $action = isset($_POST['submit_request']) ? 'submit' : 'save';
+=======
+    $action     = isset($_POST['submit_request']) ? 'submit' : 'save';
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
     $new_status = ($action === 'submit') ? 'Pending' : 'Draft';
     
     $request_id = isset($_POST['request_id']) ? (int)$_POST['request_id'] : 0;
@@ -78,7 +115,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
         header("Location: guest_request.php");
         exit;
     } else {
+<<<<<<< HEAD
         $dept           = mysqli_real_escape_string($conn, $_POST['department']);
+=======
+        // Fetching department from hidden field because the select is disabled
+        $dept           = mysqli_real_escape_string($conn, $_POST['hidden_department']);
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
         $check_in_date  = mysqli_real_escape_string($conn, $_POST['check_in_date']);
         $check_in_time  = mysqli_real_escape_string($conn, $_POST['check_in_time']);
         $check_out_date = mysqli_real_escape_string($conn, $_POST['check_out_date']);
@@ -151,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
 
                 $all_guests_data = [];
 
+<<<<<<< HEAD
                 // Insert Multiple Guests
                 foreach ($_POST['guest_name'] as $key => $val) {
                     $g_title = mysqli_real_escape_string($conn, $_POST['guest_title'][$key]);
@@ -167,17 +210,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
                     if (!mysqli_query($conn, $sql_guest)) throw new Exception("Guest Insert Error: " . mysqli_error($conn));
                     
                     $all_guests_data[] = ['name' => "$g_title $g_name", 'email' => $g_email, 'phone' => $g_phone, 'designation' => $g_desig];
+=======
+                // Insert Multiple Guests (with guest_type logic)
+                foreach ($_POST['guest_name'] as $key => $val) {
+
+                    $g_type_raw = $_POST['guest_type'][$key] ?? 'Internal';
+                    $g_type     = mysqli_real_escape_string($conn, $g_type_raw);
+
+                    $g_title_raw = trim($_POST['guest_title'][$key] ?? '');
+                    $g_name_raw  = trim($_POST['guest_name'][$key] ?? '');
+                    $g_phone_raw = trim($_POST['phone'][$key] ?? '');
+                    $g_email_raw = trim($_POST['email'][$key] ?? '');
+                    $g_desig_raw = trim($_POST['designation'][$key] ?? '');
+                    $g_id_raw    = trim($_POST['id_proof'][$key] ?? '');
+                    $g_addr_raw  = trim($_POST['address'][$key] ?? '');
+
+                    if ($g_title_raw === '' || $g_name_raw === '') {
+                        $_SESSION['msg'] = "‚ùå Please fill Title & Name for all guests.";
+                        header("Location: guest_request.php");
+                        exit;
+                    }
+
+                    if ($g_type_raw === 'Outside') {
+                        if ($g_id_raw === '') {
+                            $_SESSION['msg'] = "‚ùå For Outside guest, NID/Office ID is required.";
+                            header("Location: guest_request.php");
+                            exit;
+                        }
+                    } else {
+                        if ($g_phone_raw === '' || $g_addr_raw === '') {
+                            $_SESSION['msg'] = "‚ùå For Internal guest, Phone & Address are required.";
+                            header("Location: guest_request.php");
+                            exit;
+                        }
+                    }
+
+                    $g_title = mysqli_real_escape_string($conn, $g_title_raw);
+                    $g_name  = mysqli_real_escape_string($conn, $g_name_raw);
+                    $g_phone = mysqli_real_escape_string($conn, $g_phone_raw);
+                    $g_email = mysqli_real_escape_string($conn, $g_email_raw);
+                    $g_desig = mysqli_real_escape_string($conn, $g_desig_raw);
+                    $g_id_val= mysqli_real_escape_string($conn, $g_id_raw);
+                    $g_addr  = mysqli_real_escape_string($conn, $g_addr_raw);
+
+                    $sql_guest = "INSERT INTO visit_guests (request_id, guest_type, guest_title, guest_name, phone, email, designation, id_proof, address) 
+                                  VALUES ('$req_id', '$g_type', '$g_title', '$g_name', '$g_phone', '$g_email', '$g_desig', '$g_id_val', '$g_addr')";
+                                  
+                    if (!mysqli_query($conn, $sql_guest)) throw new Exception("Guest Insert Error: " . mysqli_error($conn));
+                    
+                    $all_guests_data[] = [
+                        'name'        => "$g_title $g_name", 
+                        'email'       => $g_email, 
+                        'phone'       => $g_phone, 
+                        'designation' => $g_desig
+                    ];
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 }
 
                 mysqli_commit($conn);
                 
+<<<<<<< HEAD
                 // Ì†ΩÌ¥Ñ INVALIDATE TOKEN TO PREVENT RESUBMISSION
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 unset($_SESSION['form_token']);
 
                 // ========================================
                 // Ì†ΩÌ≥ß SEND EMAIL LOGIC
                 // ========================================
                 if ($action === 'submit') {
+<<<<<<< HEAD
                     $headers  = "MIME-Version: 1.0\\r\\nContent-type:text/html;charset=UTF-8\\r\\nFrom: SCL Dormitory <no-reply@scl-dormitory.com>\\r\\n";
 
                     // 1. MAIL TO GUEST
@@ -185,6 +287,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
                     
                     if (!empty($user_data['email'])) {
                         $all_guests_data[] = ['name' => $user_data['full_name'], 'email' => $user_data['email'], 'phone' => '', 'designation' => ''];
+=======
+                    $headers  = "MIME-Version: 1.0\r\nContent-type:text/html;charset=UTF-8\r\nFrom: SCL Dormitory <no-reply@scl-dormitory.com>\r\n";
+
+                    $guest_subject = "Dormitory Visit Request Pending - Ref: #$req_id";
+                    
+                    if (!empty($user_data['email'])) {
+                        $all_guests_data[] = [
+                            'name'        => $user_data['full_name'], 
+                            'email'       => $user_data['email'], 
+                            'phone'       => '', 
+                            'designation' => ''
+                        ];
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                     }
 
                     $unique_emails = [];
@@ -219,7 +334,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
                         }
                     }
 
+<<<<<<< HEAD
                     // 2. MAIL TO ADMIN / AUTHORIZATION TEAM (USING BEAUTIFUL TEMPLATE)
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                     $admin_subject = "New Request #$req_id Waiting for Approval";
                     $admin_emails = [];
 
@@ -234,15 +352,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
                         }
                     }
 
+<<<<<<< HEAD
                     // Fallback email in case database doesn't return any admin email
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                     if (empty($admin_emails)) {
                         $admin_emails[] = "it1@sheltechceramics.com"; 
                     }
 
+<<<<<<< HEAD
                     $admin_check_in = date('d M Y h:i A', strtotime("$check_in_date $check_in_time"));
                     $admin_check_out = date('d M Y h:i A', strtotime("$check_out_date $check_out_time"));
                     
                     // NEW DYNAMIC HTML TEMPLATE FOR ADMIN
+=======
+                    $admin_check_in  = date('d M Y h:i A', strtotime("$check_in_date $check_in_time"));
+                    $admin_check_out = date('d M Y h:i A', strtotime("$check_out_date $check_out_time"));
+                    
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                     $admin_mail_body = "
                     <html><body style='font-family:Segoe UI,sans-serif;color:#333;margin:0;padding:0;background-color:#f4f4f4;'>
                         <div style='max-width:600px;margin:20px auto;background-color:#ffffff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>
@@ -285,7 +412,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
                     $_SESSION['msg'] = "‚úÖ Draft saved! Ref ID: #$req_id. You can edit and submit it later.";
                 }
 
+<<<<<<< HEAD
                 // ‚úÖ INSTANT REDIRECT TO PREVENT RE-SUBMISSION (PRG PATTERN)
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 header("Location: my_requests.php");
                 exit;
 
@@ -302,12 +432,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_draft']) || iss
 // ========================================
 // ‚úèÔ∏è LOAD DRAFT DATA
 // ========================================
+<<<<<<< HEAD
 $edit_id = 0;
+=======
+$edit_id      = 0;
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 $draft_master = null;
 $draft_guests = [];
 
 if (isset($_GET['edit_id'])) {
     $edit_id = (int)$_GET['edit_id'];
+<<<<<<< HEAD
     $q_master = mysqli_query($conn, "SELECT * FROM visit_requests WHERE id = $edit_id AND requested_by = '$user' AND status = 'Draft'");
     if ($q_master && mysqli_num_rows($q_master) > 0) {
         $draft_master = mysqli_fetch_assoc($q_master);
@@ -316,26 +451,65 @@ if (isset($_GET['edit_id'])) {
     } else {
         $_SESSION['msg'] = "‚ö†Ô∏è Draft not found or you don't have permission.";
         header("Location: guest_request.php");
+=======
+    $draft_sql = mysqli_query($conn, "SELECT * FROM visit_requests WHERE id = $edit_id AND status = 'Draft' AND requested_by = '".mysqli_real_escape_string($conn, $user)."'");
+    
+    if (mysqli_num_rows($draft_sql) > 0) {
+        $draft_master = mysqli_fetch_assoc($draft_sql);
+        $g_sql        = mysqli_query($conn, "SELECT * FROM visit_guests WHERE request_id = $edit_id");
+        while ($r = mysqli_fetch_assoc($g_sql)) {
+            $draft_guests[] = $r;
+        }
+    } else {
+        $_SESSION['msg'] = "‚ùå Invalid draft or you don't have permission to edit it.";
+        header("Location: my_requests.php");
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
         exit;
     }
 }
 
+<<<<<<< HEAD
 // Generate new token for the page load
 if (empty($_SESSION['form_token'])) {
     $_SESSION['form_token'] = bin2hex(random_bytes(32));
 }
 ?>
 
+=======
+// Prepare HTML strings for Purpose
+$purpose_options_html = "<option value=\"\" disabled " . ($draft_master ? "" : "selected") . ">-- Purpose of Visit --</option>";
+$saved_purpose  = $draft_master ? $draft_master['purpose'] : '';
+$is_other_purpose = true;
+
+foreach($purpose_list as $p) {
+    if($saved_purpose == $p) { $is_other_purpose = false; }
+}
+if($saved_purpose == '') { $is_other_purpose = false; }
+
+foreach($purpose_list as $p) {
+    if($p == 'Other') continue;
+    $sel = ($saved_purpose == $p) ? 'selected' : '';
+    $purpose_options_html .= "<option value=\"$p\" $sel>$p</option>";
+}
+$purpose_options_html .= "<option value=\"Other\" ".($is_other_purpose && $saved_purpose != '' ? 'selected' : '').">Other (Please specify)</option>";
+?>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+<<<<<<< HEAD
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile viewport meta -->
     <title><?php echo $edit_id > 0 ? "Edit Draft Request" : "Submit Visit Request"; ?></title>
+=======
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accommodation Request - SCL DMS</title>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+<<<<<<< HEAD
         
         /* Ì†ºÌºü Fade-in Animation */
         .page-fade-in { animation: fadeIn 0.6s ease-in-out forwards; }
@@ -371,12 +545,35 @@ if (empty($_SESSION['form_token'])) {
         }
         
         /* Overlay for mobile sidebar */
+=======
+        .sidebar { background: #1a2a3a; color: white; height: 100vh; position: fixed; width: 250px; padding: 20px; overflow-y: auto; z-index: 1000; transition: transform 0.3s ease; }
+        .content { margin-left: 250px; padding: 30px; transition: margin-left 0.3s ease; }
+        .mobile-navbar { display: none; background: #1a2a3a; color: white; padding: 15px 20px; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 999; }
+        .menu-toggle-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+        .main-card { border: none; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.08); background: white; margin-bottom: 30px; }
+        .card-header-custom { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border-radius: 12px 12px 0 0; padding: 20px 25px; }
+        .guest-card { background: #f8f9fa; border: 1px solid #e9ecef; padding: 20px; border-radius: 10px; margin-bottom: 15px; position: relative; transition: all 0.3s ease; }
+        .guest-card:hover { border-color: #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .remove-guest { position: absolute; top: 15px; right: 15px; color: #dc3545; cursor: pointer; font-size: 1.2rem; transition: transform 0.2s; }
+        .remove-guest:hover { transform: scale(1.1); color: #bd2130; }
+        .readonly-field { background-color: #e9ecef !important; cursor: not-allowed; }
+        .guest-badge { position: absolute; top: -10px; left: 15px; font-size: 0.8rem; padding: 5px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-add-guest { background-color: #e8f4fd; color: #0d6efd; border: 2px dashed #0d6efd; font-weight: 600; padding: 10px; transition: all 0.3s; }
+        .btn-add-guest:hover { background-color: #0d6efd; color: white; }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.active { transform: translateX(0); }
+            .content { margin-left: 0; padding: 15px; padding-top: 20px; }
+            .mobile-navbar { display: flex; }
+        }
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
         .sidebar-overlay.active { display: block; }
     </style>
 </head>
 <body class="page-fade-in">
 
+<<<<<<< HEAD
 <!-- Ì†ºÌºü Floating Toast Notifications -->
 <div class="toast-container" id="toastBox">
     <?php if (isset($_SESSION['msg']) && !empty($_SESSION['msg'])): ?>
@@ -403,13 +600,29 @@ if (empty($_SESSION['form_token'])) {
 </div>
 
 <!-- Mobile Navbar & Overlay -->
+=======
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <?php if(isset($_SESSION['msg'])): ?>
+    <div class="toast show align-items-center <?php echo strpos($_SESSION['msg'], '‚ùå') !== false ? 'bg-danger' : 'bg-success'; ?> text-white border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold fs-6"><?php echo strip_tags($_SESSION['msg']); ?></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <?php unset($_SESSION['msg']); endif; ?>
+</div>
+
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 <div class="mobile-navbar shadow-sm">
     <h5 class="mb-0"><i class="fas fa-hotel me-2"></i>SCL DMS</h5>
     <button class="menu-toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
+<<<<<<< HEAD
 <!-- Sidebar -->
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 <div class="sidebar" id="sidebar">
     <div class="d-flex justify-content-between align-items-center mb-4 d-md-none">
         <h4 class="mb-0"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
@@ -417,15 +630,27 @@ if (empty($_SESSION['form_token'])) {
     </div>
     <h4 class="mb-4 text-center d-none d-md-block"><i class="fas fa-hotel me-2"></i>SCL DMS</h4>
     <div class="p-3 mb-4 bg-white bg-opacity-10 rounded text-center">
+<<<<<<< HEAD
         <small>Logged in as</small><br><strong><?php echo htmlspecialchars($user); ?></strong>
     </div>
     <a href="index.php" class="btn btn-light w-100 mb-2 fw-bold"><i class="fas fa-home me-2"></i>Dashboard</a>
     <a href="guest_request.php" class="btn btn-outline-info w-100 mb-2 text-white active"><i class="fas fa-paper-plane me-2"></i>Submit Request</a>
     <a href="my_requests.php" class="btn btn-outline-light w-100 mb-2"><i class="fas fa-list-alt me-2"></i>My Sent Requests</a>
+=======
+        <small>Welcome,</small><br><strong><?php echo htmlspecialchars($user); ?></strong><br>
+        <span class="badge bg-warning text-dark mt-1"><?php echo strtoupper($role); ?></span>
+    </div>
+
+    <a href="index.php" class="btn btn-outline-light w-100 mb-2"><i class="fas fa-home me-2"></i>Dashboard</a>
+    <a href="guest_request.php" class="btn btn-info w-100 mb-2 fw-bold text-dark"><i class="fas fa-paper-plane me-2"></i>Submit Request</a>
+    <a href="my_requests.php" class="btn btn-outline-light w-100 mb-2"><i class="fas fa-list-alt me-2"></i>My Sent Requests</a>
+    <a href="profile.php" class="btn btn-outline-light w-100 mb-2"><i class="fas fa-user me-2"></i>My Profile</a>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
     <a href="logout.php" class="btn btn-danger w-100 mt-4"><i class="fas fa-sign-out-alt me-2"></i>Logout</a>
 </div>
 
 <div class="content">
+<<<<<<< HEAD
     <div class="container-fluid">
         <div class="row justify-content-center">
             <div class="col-lg-10 col-md-12"> <!-- Adjusted column size for better mobile fit -->
@@ -558,6 +783,180 @@ if (empty($_SESSION['form_token'])) {
                             </div>
                         </form>
                     </div>
+=======
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9">
+            <div class="main-card">
+                <div class="card-header-custom d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-file-signature me-2"></i> <?php echo $edit_id > 0 ? "Edit Draft Request #$edit_id" : "Accommodation Request Form"; ?></h4>
+                    <span class="badge bg-light text-primary fs-6"><i class="far fa-clock me-1"></i><?php echo date('d M Y'); ?></span>
+                </div>
+                
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" id="requestForm">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['form_token']; ?>">
+                        <input type="hidden" name="request_id" value="<?php echo $edit_id; ?>">
+                        
+                        <input type="hidden" name="hidden_department" value="<?php echo htmlspecialchars($current_dept); ?>">
+
+                        <h5 class="border-bottom pb-2 text-primary"><i class="fas fa-info-circle me-2"></i>Visit Details</h5>
+                        <div class="row mb-4 bg-light p-3 rounded">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
+                                <select id="department" class="form-select readonly-field" disabled>
+                                    <option value="<?php echo htmlspecialchars($current_dept); ?>" selected><?php echo htmlspecialchars($current_dept); ?></option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Purpose of Visit <span class="text-danger">*</span></label>
+                                <select name="purpose_select" id="purpose_select" class="form-select border-primary" required>
+                                    <?php echo $purpose_options_html; ?>
+                                </select>
+                                <input type="text" name="purpose_note" id="purpose_note" class="form-control mt-2 <?php echo ($is_other_purpose && $saved_purpose != '') ? '' : 'd-none'; ?>" placeholder="Specify purpose..." value="<?php echo ($is_other_purpose) ? htmlspecialchars($saved_purpose) : ''; ?>">
+                            </div>
+
+                            <div class="col-md-3 col-6 mb-3">
+                                <label class="form-label fw-bold text-success"><i class="fas fa-sign-in-alt me-1"></i>Check-in Date <span class="text-danger">*</span></label>
+                                <input type="date" name="check_in_date" id="check_in_date" class="form-control border-success" required value="<?php echo $draft_master ? $draft_master['check_in_date'] : ''; ?>">
+                            </div>
+                            <div class="col-md-3 col-6 mb-3">
+                                <label class="form-label fw-bold text-success"><i class="far fa-clock me-1"></i>Time <span class="text-danger">*</span></label>
+                                <input type="time" name="check_in_time" class="form-control border-success" required value="<?php echo $draft_master ? $draft_master['check_in_time'] : ''; ?>">
+                            </div>
+                            
+                            <div class="col-md-3 col-6 mb-3">
+                                <label class="form-label fw-bold text-danger"><i class="fas fa-sign-out-alt me-1"></i>Check-out Date <span class="text-danger">*</span></label>
+                                <input type="date" name="check_out_date" id="check_out_date" class="form-control border-danger" required value="<?php echo $draft_master ? $draft_master['check_out_date'] : ''; ?>">
+                            </div>
+                            <div class="col-md-3 col-6 mb-3">
+                                <label class="form-label fw-bold text-danger"><i class="far fa-clock me-1"></i>Time <span class="text-danger">*</span></label>
+                                <input type="time" name="check_out_time" class="form-control border-danger" required value="<?php echo $draft_master ? $draft_master['check_out_time'] : ''; ?>">
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-3 mt-4 border-bottom pb-2">
+                            <h5 class="text-primary mb-0"><i class="fas fa-users me-2"></i>Guest Details</h5>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="addGuest()"><i class="fas fa-plus me-1"></i>Add Extra Guest</button>
+                        </div>
+
+                        <div id="guestContainer">
+                            <?php if (!empty($draft_guests)): ?>
+                                <?php foreach ($draft_guests as $index => $g): ?>
+                                    <div class="guest-card" id="guest_<?php echo $index; ?>">
+                                        <?php if ($index > 0): ?>
+                                            <span class="remove-guest" onclick="removeGuest('guest_<?php echo $index; ?>')"><i class="fas fa-times-circle"></i></span>
+                                        <?php endif; ?>
+                                        <span class="badge <?php echo $index == 0 ? 'bg-secondary' : 'bg-info text-dark'; ?> mb-3 guest-badge">Guest #<?php echo $index + 1; ?> <?php echo $index == 0 ? '(Main)' : ''; ?></span>
+                                        
+                                        <?php if ($index == 0): ?>
+                                            <input type="hidden" name="guest_type[]" value="Internal">
+                                        <?php endif; ?>
+
+                                        <div class="row">
+                                            <?php if ($index > 0): ?>
+                                                <div class="col-sm-12 col-md-3 mb-3">
+                                                    <label class="form-label">Guest Type <span class="text-danger">*</span></label>
+                                                    <select name="guest_type[]" class="form-select guest-type-select" onchange="toggleGuestFields(this, 'guest_<?php echo $index; ?>')" required>
+                                                        <option value="" disabled <?php if(empty($g['guest_type'])) echo 'selected'; ?>>-- Guest Type --</option>
+                                                        <option value="Internal" <?php if(($g['guest_type'] ?? '') == 'Internal') echo 'selected'; ?>>Internal Guest</option>
+                                                        <option value="Outside" <?php if(($g['guest_type'] ?? '') == 'Outside') echo 'selected'; ?>>Outside Guest</option>
+                                                    </select>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <div class="col-sm-4 col-md-<?php echo ($index > 0) ? '3' : '2'; ?> mb-3">
+                                                <label class="form-label">Title *</label>
+                                                <select name="guest_title[]" class="form-select" required>
+                                                    <option value="" disabled>-- Title --</option>
+                                                    <option value="Mr."  <?php if($g['guest_title']=='Mr.')  echo 'selected'; ?>>Mr.</option>
+                                                    <option value="Mrs." <?php if($g['guest_title']=='Mrs.') echo 'selected'; ?>>Mrs.</option>
+                                                    <option value="Ms."  <?php if($g['guest_title']=='Ms.')  echo 'selected'; ?>>Ms.</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-8 col-md-<?php echo ($index > 0) ? '6' : '5'; ?> mb-3">
+                                                <label class="form-label">Name *</label>
+                                                <input type="text" name="guest_name[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['guest_name']); ?>" <?php echo $index == 0 ? 'readonly' : 'required'; ?>>
+                                            </div>
+                                            <div class="col-sm-12 col-md-<?php echo ($index > 0) ? '4' : '5'; ?> mb-3">
+                                                <label class="form-label">Phone <span class="text-danger">*</span></label>
+                                                <input type="text" name="phone[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['phone'] ?? ''); ?>" <?php echo $index == 0 ? 'readonly' : 'required'; ?>>
+                                            </div>
+                                            <div class="col-sm-12 col-md-4 mb-3">
+                                                <label class="form-label">Email</label>
+                                                <input type="email" name="email[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['email'] ?? ''); ?>" <?php echo $index == 0 ? 'readonly' : ''; ?>>
+                                            </div>
+                                            <div class="col-sm-12 col-md-4 mb-3">
+                                                <label class="form-label">Designation</label>
+                                                <input type="text" name="designation[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['designation'] ?? ''); ?>" <?php echo $index == 0 ? 'readonly' : ''; ?>>
+                                            </div>
+                                            <div class="col-sm-12 col-md-6 mb-3">
+                                                <label class="form-label">Address <span class="text-danger">*</span></label>
+                                                <input type="text" name="address[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['address'] ?? ''); ?>" <?php echo $index == 0 ? 'readonly' : 'required'; ?>>
+                                            </div>
+                                            <div class="col-sm-12 col-md-6 mb-3">
+                                                <label class="form-label">NID/Office ID</label>
+                                                <input type="text" name="id_proof[]" class="form-control <?php echo $index == 0 ? 'readonly-field' : ''; ?>" value="<?php echo htmlspecialchars($g['id_proof'] ?? ''); ?>" <?php echo $index == 0 ? 'readonly' : ''; ?>>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="guest-card" id="guest_0">
+                                    <span class="badge bg-secondary mb-3 guest-badge">Guest #1 (Main)</span>
+                                    
+                                    <input type="hidden" name="guest_type[]" value="Internal">
+                                    <div class="row">
+                                        <div class="col-sm-4 col-md-2 mb-3">
+                                            <label class="form-label">Title *</label>
+                                            <select name="guest_title[]" class="form-select" required>
+                                                <option value="" disabled selected>-- Title --</option>
+                                                <option value="Mr.">Mr.</option>
+                                                <option value="Mrs.">Mrs.</option>
+                                                <option value="Ms.">Ms.</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-8 col-md-5 mb-3">
+                                            <label class="form-label">Name *</label>
+                                            <input type="text" name="guest_name[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['full_name']); ?>" readonly>
+                                        </div>
+                                        <div class="col-sm-12 col-md-5 mb-3">
+                                            <label class="form-label">Phone *</label>
+                                            <input type="text" name="phone[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['phone']); ?>" readonly>
+                                        </div>
+                                        <div class="col-sm-12 col-md-4 mb-3">
+                                            <label class="form-label">Email</label>
+                                            <input type="email" name="email[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['email']); ?>" readonly>
+                                        </div>
+                                        <div class="col-sm-12 col-md-4 mb-3">
+                                            <label class="form-label">Designation</label>
+                                            <input type="text" name="designation[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['designation']); ?>" readonly>
+                                        </div>
+                                        <div class="col-sm-12 col-md-4 mb-3">
+                                            <label class="form-label">Address *</label>
+                                            <input type="text" name="address[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['address']); ?>" readonly required>
+                                        </div>
+                                        <div class="col-sm-12 col-md-4 mb-3">
+                                            <label class="form-label">NID/Office ID</label>
+                                            <input type="text" name="id_proof[]" class="form-control readonly-field" value="<?php echo htmlspecialchars($user_data['id_proof']); ?>" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <button type="button" class="btn w-100 btn-add-guest mb-4" onclick="addGuest()"><i class="fas fa-user-plus me-2"></i>Click to add more guests</button>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <button type="submit" name="save_draft" class="btn btn-outline-secondary w-100 fw-bold py-2"><i class="fas fa-save me-2"></i>Save as Draft</button>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <button type="submit" name="submit_request" class="btn btn-primary w-100 fw-bold py-2 fs-5"><i class="fas fa-paper-plane me-2"></i>Submit Final Request</button>
+                            </div>
+                        </div>
+                    </form>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 </div>
             </div>
         </div>
@@ -566,12 +965,16 @@ if (empty($_SESSION['form_token'])) {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+<<<<<<< HEAD
 // Sidebar Toggle Logic for Mobile
+=======
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('active');
     document.getElementById('sidebarOverlay').classList.toggle('active');
 }
 
+<<<<<<< HEAD
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize Toasts
     var toastElList = [].slice.call(document.querySelectorAll('.toast'));
@@ -643,6 +1046,165 @@ function removeGuest(id) {
     if (el) el.remove();
     renumberGuests();
 }
+=======
+var currentDept = "<?php echo $current_dept; ?>";
+var deptPurposes = <?php echo json_encode($dept_purposes); ?>;
+
+document.getElementById('purpose_select').addEventListener('change', function() {
+    var note = document.getElementById('purpose_note');
+    if (this.value === 'Other') {
+        note.classList.remove('d-none');
+        note.required = true;
+    } else {
+        note.classList.add('d-none');
+        note.required = false;
+    }
+});
+
+// Guest Type Dynamic Validation
+function toggleGuestFields(selectElem, cardId) {
+    var type = selectElem.value;
+    var card = document.getElementById(cardId);
+    
+    if (!card) return;
+
+    var phoneInput   = card.querySelector('input[name="phone[]"], input[name="phone"]');
+    var emailInput   = card.querySelector('input[name="email[]"], input[name="email"]');
+    var desigInput   = card.querySelector('input[name="designation[]"], input[name="designation"]');
+    var addressInput = card.querySelector('input[name="address[]"], input[name="address"]');
+    var idInput      = card.querySelector('input[name="id_proof[]"], input[name="id_proof"]');
+
+    if (type === 'Outside') {
+        if (phoneInput)  { phoneInput.required = false;   phoneInput.previousElementSibling.innerHTML = 'Phone'; }
+        if (emailInput)  { emailInput.required = false;   emailInput.previousElementSibling.innerHTML = 'Email'; }
+        if (desigInput)  { desigInput.required = false;   desigInput.previousElementSibling.innerHTML = 'Designation'; }
+        if (addressInput){ addressInput.required = false; addressInput.previousElementSibling.innerHTML = 'Address'; }
+        if (idInput) {
+            idInput.required = true;
+            idInput.previousElementSibling.innerHTML = 'NID/Office ID <span class="text-danger">*</span>';
+        }
+    } else {
+        if (phoneInput)  { phoneInput.required = true;   phoneInput.previousElementSibling.innerHTML = 'Phone <span class="text-danger">*</span>'; }
+        if (emailInput)  { emailInput.required = true;   emailInput.previousElementSibling.innerHTML = 'Email <span class="text-danger">*</span>'; }
+        if (desigInput)  { desigInput.required = true;   desigInput.previousElementSibling.innerHTML = 'Designation <span class="text-danger">*</span>'; }
+        if (addressInput){ addressInput.required = true; addressInput.previousElementSibling.innerHTML = 'Address <span class="text-danger">*</span>'; }
+        if (idInput) {
+            idInput.required = true;
+            idInput.previousElementSibling.innerHTML = 'NID/Office ID <span class="text-danger">*</span>';
+        }
+    }
+}
+
+function addGuest() {
+    const container = document.getElementById('guestContainer');
+    const id = 'guest_' + Date.now();
+    let html = `
+    <div class="guest-card" id="${id}">
+        <span class="remove-guest" onclick="removeGuest('${id}')"><i class="fas fa-times-circle"></i></span>
+        <span class="badge bg-info text-dark mb-3 guest-badge">Guest</span>
+        <div class="row">
+            <div class="col-sm-12 col-md-3 mb-3">
+                <label class="form-label">Guest Type <span class="text-danger">*</span></label>
+                <select name="guest_type[]" class="form-select guest-type-select" onchange="toggleGuestFields(this, '${id}')" required>
+                    <option value="" disabled selected>-- Guest Type --</option>
+                    <option value="Internal">Internal Guest</option>
+                    <option value="Outside">Outside Guest</option>
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-3 mb-3">
+                <label class="form-label">Title <span class="text-danger">*</span></label>
+                <select name="guest_title[]" class="form-select" required>
+                    <option value="" disabled selected>-- Title --</option>
+                    <option value="Mr.">Mr.</option>
+                    <option value="Mrs.">Mrs.</option>
+                    <option value="Ms.">Ms.</option>
+                </select>
+            </div>
+            <div class="col-sm-8 col-md-6 mb-3">
+                <label class="form-label">Name <span class="text-danger">*</span></label>
+                <input type="text" name="guest_name[]" class="form-control" required>
+            </div>
+            <div class="col-sm-12 col-md-4 mb-3">
+                <label class="form-label">Phone</label>
+                <input type="text" name="phone[]" class="form-control">
+            </div>
+            <div class="col-sm-12 col-md-4 mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" name="email[]" class="form-control">
+            </div>
+            <div class="col-sm-12 col-md-4 mb-3">
+                <label class="form-label">Designation</label>
+                <input type="text" name="designation[]" class="form-control">
+            </div>
+            <div class="col-sm-12 col-md-6 mb-3">
+                <label class="form-label">Address</label>
+                <input type="text" name="address[]" class="form-control">
+            </div>
+            <div class="col-sm-12 col-md-6 mb-3">
+                <label class="form-label">NID/Office ID</label>
+                <input type="text" name="id_proof[]" class="form-control">
+            </div>
+        </div>
+    </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    renumberGuests();
+}
+
+function renumberGuests() {
+    const cards = document.querySelectorAll('#guestContainer .guest-card');
+    cards.forEach((card, idx) => {
+        const badge = card.querySelector('.guest-badge');
+        const removeBtn = card.querySelector('.remove-guest');
+        if (idx === 0) {
+            if (badge) badge.textContent = 'Guest #1 (Main)';
+            if (removeBtn) removeBtn.style.display = 'none';
+        } else {
+            if (badge) badge.textContent = 'Guest #' + (idx + 1);
+            if (removeBtn) removeBtn.style.display = 'block';
+        }
+    });
+}
+
+function removeGuest(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.transform = 'scale(0.9)';
+        el.style.opacity = '0';
+        setTimeout(() => {
+            el.remove();
+            renumberGuests();
+        }, 200);
+    }
+}
+
+document.getElementById('requestForm').addEventListener('submit', function(e) {
+    var inDate = document.getElementById('check_in_date').value;
+    var outDate = document.getElementById('check_out_date').value;
+    if(outDate < inDate) {
+        e.preventDefault();
+        alert('Check-out date cannot be before check-in date!');
+    }
+});
+
+document.getElementById('check_out_date').addEventListener('change', function() {
+    var inDate = document.getElementById('check_in_date').value;
+    if(this.value && inDate && this.value < inDate) {
+        alert('Check-out date must be after Check-in date.');
+        this.value = inDate;
+    }
+});
+
+// APPLY GUEST TYPE LOGIC ON PAGE LOAD (EDIT MODE)
+document.addEventListener('DOMContentLoaded', function () {
+    var guestCards = document.querySelectorAll('#guestContainer .guest-card');
+    guestCards.forEach(function(card) {
+        var typeSelect = card.querySelector('select.guest-type-select');
+        if (typeSelect) {
+            toggleGuestFields(typeSelect, card.id);
+        }
+    });
+});
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 </script>
 </body>
 </html>

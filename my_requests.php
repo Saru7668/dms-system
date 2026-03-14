@@ -45,13 +45,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_request_submit
             $admin_res = mysqli_query($conn, $admin_sql);
             
             if ($admin_res && mysqli_num_rows($admin_res) > 0) {
+<<<<<<< HEAD
                 $headers  = "MIME-Version: 1.0\\r\\n";
                 $headers .= "Content-type: text/html; charset=UTF-8\\r\\n";
                 $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\\r\\n";
+=======
+                // FIXED HEADERS
+                $headers = "MIME-Version: 1.0\r\n";
+                $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+                $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\r\n";
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 
                 $subj_c = "Ì†ΩÌ∫® Cancellation Request: Ref #$cancel_req_id";
                 
                 $body_c = "
+<<<<<<< HEAD
+=======
+                <!DOCTYPE html>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 <html><body style='font-family:Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
                     <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #dddddd;'>
                         <div style='background-color:#1a2a3a; color:#ffffff; padding:15px; text-align:center;'>
@@ -112,13 +123,24 @@ if (isset($_GET['move_to_draft_id'])) {
             $admin_sql = "SELECT email FROM users WHERE user_role IN ('approver','admin','superadmin') AND email IS NOT NULL AND email != ''";
             $admin_res = mysqli_query($conn, $admin_sql);
             if ($admin_res && mysqli_num_rows($admin_res) > 0) {
+<<<<<<< HEAD
                 $headers  = "MIME-Version: 1.0\\r\\n";
                 $headers .= "Content-type: text/html; charset=UTF-8\\r\\n";
                 $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\\r\\n";
+=======
+                // FIXED HEADERS
+                $headers = "MIME-Version: 1.0\r\n";
+                $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+                $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\r\n";
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 
                 $subj_a = "‚ö†Ô∏è Request Moved to Draft: Ref #$draft_id by $user";
                 
                 $body_a = "
+<<<<<<< HEAD
+=======
+                <!DOCTYPE html>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 <html><body style='font-family:Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
                     <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #dddddd;'>
                         <div style='background-color:#ffc107; color:#000000; padding:15px; text-align:center;'>
@@ -153,12 +175,17 @@ if (isset($_GET['move_to_draft_id'])) {
 }
 
 // ========================================
+<<<<<<< HEAD
 // Ì†ΩÌ∑ëÔ∏è DELETE LOGIC
+=======
+// Ì†ΩÌ∑ëÔ∏è DELETE LOGIC (FIXED EMAIL HTML BUG)
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
 // ========================================
 if (isset($_GET['delete_id'])) {
     $del_id = (int)$_GET['delete_id'];
     $check_sql = "SELECT r.*, u.email as user_email FROM visit_requests r JOIN users u ON r.requested_by = u.username WHERE r.id = $del_id AND r.requested_by = '".mysqli_real_escape_string($conn,$user)."' AND r.status IN ('Pending','Draft')";
     $check_res = mysqli_query($conn, $check_sql);
+<<<<<<< HEAD
 
     if ($check_res && mysqli_num_rows($check_res) > 0) {
         $del_data   = mysqli_fetch_assoc($check_res);
@@ -169,30 +196,68 @@ if (isset($_GET['delete_id'])) {
 
         mysqli_query($conn, "DELETE FROM visit_guests WHERE request_id = $del_id");
 
+=======
+
+    if ($check_res && mysqli_num_rows($check_res) > 0) {
+        $del_data   = mysqli_fetch_assoc($check_res);
+        $del_status = $del_data['status'];
+        $guest_name = $del_data['guest_name'];
+        $check_in   = date('d M Y', strtotime($del_data['check_in_date']));
+        $user_email = $del_data['user_email'];
+
+        mysqli_query($conn, "DELETE FROM visit_guests WHERE request_id = $del_id");
+
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
         if (mysqli_query($conn, "DELETE FROM visit_requests WHERE id = $del_id")) {
             $headers  = "MIME-Version: 1.0\\r\\n";
             $headers .= "Content-type: text/html; charset=UTF-8\\r\\n";
             $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>\\r\\n";
             
+<<<<<<< HEAD
             if ($del_status === 'Draft') {
                 if (!empty($user_email)) {
                     $subj = "Ì†ΩÌ∑ëÔ∏è Draft Deleted - Ref #$del_id";
                     $body = "
                     <html><body style='font-family:Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
                         <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #dddddd;'>
+=======
+            // PROPER MAIL HEADERS
+            $headers  = "MIME-Version: 1.0" . "\r\n";
+            $headers .= "Content-type: text/html; charset=UTF-8" . "\r\n";
+            $headers .= "From: SCL Dormitory <no-reply@scl-dormitory.com>" . "\r\n";
+            
+            if ($del_status === 'Draft') {
+                if (!empty($user_email)) {
+                    $subj = "Draft Deleted - Ref #$del_id";
+                    $body = "
+                    <!DOCTYPE html>
+                    <html><body style='font-family:\"Segoe UI\",Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
+                        <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #e0e0e0;'>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                             <div style='background-color:#1a2a3a; color:#ffffff; padding:15px; text-align:center;'>
                                 <h2 style='margin:0; font-size:22px;'>Draft Deleted</h2>
                                 <p style='margin:5px 0 0; font-size:14px; color:#d1d8e0;'>Reference ID: #$del_id</p>
                             </div>
                             <div style='padding:20px;'>
                                 <p style='margin-top:0;'>Dear <strong>$user</strong>,</p>
+<<<<<<< HEAD
                                 <p>Your draft visit request has been successfully deleted.</p>
                                 
                                 <div style='background-color:#f9f9f9; border-left:4px solid #6c757d; padding:15px; margin:20px 0;'>
+=======
+                                <p>Your draft visit request has been successfully <strong style='color:#dc3545;'>DELETED</strong>.</p>
+                                
+                                <div style='background-color:#f8f9fa; border-left:4px solid #6c757d; padding:15px; margin:20px 0;'>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                                     <p style='margin:0 0 8px 0;'><strong>Guest Name:</strong> $guest_name</p>
                                     <p style='margin:0 0 8px 0;'><strong>Check-in Date:</strong> $check_in</p>
                                     <p style='margin:0;'><strong>Status:</strong> Draft (Deleted)</p>
                                 </div>
+<<<<<<< HEAD
+=======
+                                <br>
+                                <p style='margin:0;'>Best regards,<br><strong>SCL Dormitory Management Team</strong></p>
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                             </div>
                             <div style='background-color:#f1f1f1; color:#777777; text-align:center; padding:10px; font-size:12px; border-top:1px solid #eeeeee;'>
                                 SCL Dormitory Management System
@@ -200,6 +265,7 @@ if (isset($_GET['delete_id'])) {
                         </div>
                     </body></html>";
                     @mail($user_email, $subj, $body, $headers);
+<<<<<<< HEAD
                 }
                 $message = "<div class='alert alert-info'>Ì†ΩÌ∑ëÔ∏è Draft deleted successfully.</div>";
             } else {
@@ -259,6 +325,72 @@ if (isset($_GET['delete_id'])) {
                         if (!empty($ar['email'])) @mail($ar['email'], $subj_a, $body_a, $headers);
                     }
                 }
+=======
+                }
+                $message = "<div class='alert alert-info'>Ì†ΩÌ∑ëÔ∏è Draft deleted successfully.</div>";
+            } else {
+                if (!empty($user_email)) {
+                    $subj_u = "Request Withdrawn - Ref #$del_id";
+                    $body_u = "
+                    <!DOCTYPE html>
+                    <html><body style='font-family:\"Segoe UI\",Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
+                        <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #e0e0e0;'>
+                            <div style='background-color:#1a2a3a; color:#ffffff; padding:15px; text-align:center;'>
+                                <h2 style='margin:0; font-size:22px;'>Request Withdrawn</h2>
+                                <p style='margin:5px 0 0; font-size:14px; color:#d1d8e0;'>Reference ID: #$del_id</p>
+                            </div>
+                            <div style='padding:20px;'>
+                                <p style='margin-top:0;'>Dear <strong>$user</strong>,</p>
+                                <p>Your pending visit request has been <strong style='color:#dc3545;'>WITHDRAWN</strong> successfully.</p>
+                                
+                                <div style='background-color:#f8f9fa; border-left:4px solid #dc3545; padding:15px; margin:20px 0;'>
+                                    <p style='margin:0 0 8px 0;'><strong>Guest Name:</strong> $guest_name</p>
+                                    <p style='margin:0 0 8px 0;'><strong>Check-in Date:</strong> $check_in</p>
+                                    <p style='margin:0; color:#dc3545;'><strong>Status:</strong> Deleted by You</p>
+                                </div>
+                                <br>
+                                <p style='margin:0;'>Best regards,<br><strong>SCL Dormitory Management Team</strong></p>
+                            </div>
+                            <div style='background-color:#f1f1f1; color:#777777; text-align:center; padding:10px; font-size:12px; border-top:1px solid #eeeeee;'>
+                                SCL Dormitory Management System
+                            </div>
+                        </div>
+                    </body></html>";
+                    @mail($user_email, $subj_u, $body_u, $headers);
+                }
+                
+                $admin_sql = "SELECT email FROM users WHERE user_role IN ('approver','admin','superadmin') AND email IS NOT NULL AND email != ''";
+                $admin_res = mysqli_query($conn, $admin_sql);
+                if ($admin_res) {
+                    $subj_a = "Request Withdrawn: Ref #$del_id by $user";
+                    $body_a = "
+                    <!DOCTYPE html>
+                    <html><body style='font-family:\"Segoe UI\",Arial,sans-serif; margin:0; padding:0; background-color:#f4f4f4;'>
+                        <div style='max-width:600px; margin:20px auto; background-color:#ffffff; border:1px solid #e0e0e0;'>
+                            <div style='background-color:#dc3545; color:#ffffff; padding:15px; text-align:center;'>
+                                <h2 style='margin:0; font-size:22px;'>Request Withdrawn</h2>
+                                <p style='margin:5px 0 0; font-size:14px; color:#f8d7da;'>Reference ID: #$del_id</p>
+                            </div>
+                            <div style='padding:20px;'>
+                                <p style='margin-top:0;'>Dear <strong>Authorization Team</strong>,</p>
+                                <p>A pending request has been <strong style='color:#dc3545;'>WITHDRAWN</strong> by the user.</p>
+                                
+                                <div style='background-color:#f8f9fa; border-left:4px solid #dc3545; padding:15px; margin:20px 0;'>
+                                    <p style='margin:0 0 8px 0;'><strong>Guest Name:</strong> $guest_name</p>
+                                    <p style='margin:0 0 8px 0;'><strong>Check-in Date:</strong> $check_in</p>
+                                    <p style='margin:0;'><strong>Deleted By:</strong> $user</p>
+                                </div>
+                            </div>
+                            <div style='background-color:#f1f1f1; color:#777777; text-align:center; padding:10px; font-size:12px; border-top:1px solid #eeeeee;'>
+                                SCL Dormitory Management System
+                            </div>
+                        </div>
+                    </body></html>";
+                    while ($ar = mysqli_fetch_assoc($admin_res)) {
+                        if (!empty($ar['email'])) @mail($ar['email'], $subj_a, $body_a, $headers);
+                    }
+                }
+>>>>>>> 624b13f (New Feature and Submit Request update  commit with version 1.5)
                 $message = "<div class='alert alert-danger'>Ì†ΩÌ∑ëÔ∏è Request withdrawn. Confirmation email sent.</div>";
             }
         } else {
